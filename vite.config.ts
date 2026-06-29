@@ -13,6 +13,15 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    // Vite 5+ defaults to placing the manifest at `.vite/manifest.json`
+    // inside the outDir, but Laravel's @vite() helper expects it at the
+    // root of the build directory (public/build/manifest.json).
+    // Setting this explicitly keeps the manifest where Laravel can find it.
+    manifest: "manifest.json",
+    outDir: "public/build",
+    emptyOutDir: true,
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "resources/js"),
