@@ -1,13 +1,15 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import { motion, useScroll, useTransform, AnimatePresence, Variants } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
-import { getNewArrivals, getBestSellers, getProductsByColor } from "@/data/products";
+import { useProducts } from "@/hooks/useProducts";
+import { ScrollIndicator } from "@/components/ScrollIndicator";
+import { fetchHomepageColors, fetchHomepageInstagramGallery, HomepageColor, InstagramGalleryItem } from "@/lib/homepageApi";
 
-const fadeUp = {
+const fadeUp: Variants = {
   hidden: { opacity: 0, y: 32 },
   visible: (i: number) => ({
     opacity: 1,
@@ -16,18 +18,32 @@ const fadeUp = {
   }),
 };
 
+/** Ordered list of homepage sections for the scroll indicator */
+const SCROLL_SECTIONS = [
+  { id: "section-hero",            nextLabel: "COLLECTIONS",         nextId: "section-collections" },
+  { id: "section-collections",     nextLabel: "JUST IN",             nextId: "section-new-arrivals" },
+  { id: "section-new-arrivals",    nextLabel: "CURATED PALETTES",    nextId: "section-color" },
+  { id: "section-color",           nextLabel: "FEATURED COLLECTIONS",nextId: "section-best-sellers" },
+  { id: "section-best-sellers",    nextLabel: "LIMITED EDITION",     nextId: "section-limited-edition" },
+  { id: "section-limited-edition", nextLabel: "OUR STORY",           nextId: "section-our-story" },
+  { id: "section-our-story",       nextLabel: "WHY J ATELIER",       nextId: "section-why" },
+  { id: "section-why",             nextLabel: "AS WORN",             nextId: "section-reviews" },
+  { id: "section-reviews",         nextLabel: "THE EDIT",            nextId: "section-gallery" },
+  { id: "section-gallery",         nextLabel: "THE EDIT",            nextId: "section-newsletter" },
+];
+
 const COLORS = [
   { label: "Ivory", hex: "#F5F0E8", slug: "ivory" },
   { label: "Black", hex: "#1A1A1A", slug: "black" },
-  { label: "Mocha", hex: "#8C6A56", slug: "mocha" },
-  { label: "Olive", hex: "#5C5C3D", slug: "olive" },
+  { label: "Pink", hex: "#F4A7B9", slug: "pink" },
+  { label: "Sky Blue", hex: "#87CEEB", slug: "skyblue" },
 ];
 
 const COLLECTIONS = [
-  { label: "New Arrivals", slug: "new-arrivals", image: "https://images.unsplash.com/photo-1578587018452-892bacefd3f2?w=800&q=80" },
-  { label: "Best Sellers", slug: "best-sellers", image: "https://images.unsplash.com/photo-1550614152-73621ac5889b?w=800&q=80" },
-  { label: "Oversized", slug: "oversized", image: "https://images.unsplash.com/photo-1630699144867-604c0e65d77a?w=800&q=80" },
-  { label: "Limited Edition", slug: "limited-edition", image: "https://images.unsplash.com/photo-1481931098730-318b6f776db0?w=800&q=80" },
+  { label: "New Arrivals", slug: "new-arrivals", image: "/images/New Arrivals/aurora-pullover-hoodie-ivory.webp" },
+  { label: "Best Sellers", slug: "best-sellers", image: "/images/Best Sellers/willow-pullover-hoodie-brown.webp" },
+  { label: "Oversized", slug: "oversized", image: "/images/oversized/onyx-oversized-hoodie-black.avif" },
+  { label: "Limited Edition", slug: "limited-edition", image: "/images/limited-edition/azure-long-sleeve-sky-blue.jpg" },
 ];
 
 const GALLERY = [
@@ -46,30 +62,52 @@ const REVIEWS = [
 ];
 
 export default function Home() {
-  const heroRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
+
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const heroY = useTransform(scrollYProgress, [0, 1], ["0%", "20%"]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
 
   const [activeColor, setActiveColor] = useState<string | null>(null);
+  const [colors, setColors] = useState<HomepageColor[]>(COLORS);
+  const [gallery, setGallery] = useState<InstagramGalleryItem[]>(
+    GALLERY.map((src, index) => ({
+      id: -(index + 1),
+      image_path: src,
+      alt_text: "As Worn Gallery Image " + (index + 1),
+      instagram_url: "https://instagram.com",
+      is_enabled: true,
+      sort_order: index
+    }))
+  );
+
+  useEffect(() => {
+    fetchHomepageColors().then(setColors).catch(console.error);
+    fetchHomepageInstagramGallery().then(setGallery).catch(console.error);
+  }, []);
+
+  const { getNewArrivals, getBestSellers, getProductsByColor, loading } = useProducts();
 
   const newArrivals = getNewArrivals().slice(0, 4);
   const bestSellers = getBestSellers().slice(0, 4);
 
   const colorProducts = activeColor
-    ? getProductsByColor(activeColor).slice(0, 4)
+    ? getProductsByColor(activeColor)
     : [];
 
   const otherColors = activeColor
-    ? COLORS.filter((c) => c.label !== activeColor)
-    : COLORS;
+    ? colors.filter((c) => c.label !== activeColor)
+    : colors;
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
+      {/* Dior-style scroll indicator */}
+      <ScrollIndicator sections={SCROLL_SECTIONS} />
+
       {/* Hero */}
-      <section ref={heroRef} className="relative h-screen overflow-hidden">
+      <section id="section-hero" ref={heroRef} className="relative h-screen overflow-hidden">
         <motion.div style={{ y: heroY }} className="absolute inset-0">
           <img
             src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=1800&q=90"
@@ -141,7 +179,7 @@ export default function Home() {
       </section>
 
       {/* Featured Collections */}
-      <section className="py-24 px-6 max-w-7xl mx-auto">
+      <section id="section-collections" className="py-24 px-6 max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -187,7 +225,7 @@ export default function Home() {
       </section>
 
       {/* New Arrivals */}
-      <section className="py-24 px-6 max-w-7xl mx-auto">
+      <section id="section-new-arrivals" className="py-24 px-6 max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -210,7 +248,7 @@ export default function Home() {
       </section>
 
       {/* Shop by Color — Interactive */}
-      <section className="py-24 bg-card/50">
+      <section id="section-color" className="py-24 bg-card/50">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -224,7 +262,7 @@ export default function Home() {
 
           {/* Color Swatches */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-            {COLORS.map((color, i) => (
+            {colors.map((color, i) => (
               <motion.div
                 key={color.slug}
                 custom={i}
@@ -239,16 +277,14 @@ export default function Home() {
                   data-testid={`button-color-${color.slug}`}
                 >
                   <div
-                    className={`aspect-square mb-4 border transition-all duration-500 ${
-                      activeColor === color.label
+                    className={`aspect-square mb-4 border transition-all duration-500 ${activeColor === color.label
                         ? "border-foreground scale-[0.96] ring-2 ring-foreground ring-offset-2"
                         : "border-border/20 group-hover:scale-[0.97]"
-                    }`}
+                      }`}
                     style={{ backgroundColor: color.hex }}
                   />
-                  <p className={`text-xs uppercase tracking-widest transition-colors ${
-                    activeColor === color.label ? "text-accent font-medium" : "group-hover:text-accent"
-                  }`}>
+                  <p className={`text-xs uppercase tracking-widest transition-colors ${activeColor === color.label ? "text-accent font-medium" : "group-hover:text-accent"
+                    }`}>
                     {color.label}
                   </p>
                 </button>
@@ -271,7 +307,7 @@ export default function Home() {
                   <div className="flex items-center gap-3">
                     <div
                       className="w-4 h-4 rounded-full border border-border/30"
-                      style={{ backgroundColor: COLORS.find(c => c.label === activeColor)?.hex }}
+                      style={{ backgroundColor: colors.find(c => c.label === activeColor)?.hex }}
                     />
                     <p className="text-xs uppercase tracking-widest text-muted-foreground">
                       Showing: <span className="text-foreground font-medium">{activeColor}</span>
@@ -321,7 +357,7 @@ export default function Home() {
       </section>
 
       {/* Best Sellers */}
-      <section className="py-24 px-6 max-w-7xl mx-auto">
+      <section id="section-best-sellers" className="py-24 px-6 max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -344,9 +380,9 @@ export default function Home() {
       </section>
 
       {/* Limited Edition Banner */}
-      <section className="relative h-[70vh] overflow-hidden">
+      <section id="section-limited-edition" className="relative h-[70vh] overflow-hidden">
         <img
-          src="https://images.unsplash.com/photo-1481931098730-318b6f776db0?w=1800&q=90"
+          src="/images/limited-edition-banner.png"
           alt="Limited Edition"
           className="w-full h-full object-cover object-center"
         />
@@ -388,7 +424,7 @@ export default function Home() {
       </section>
 
       {/* Our Story */}
-      <section className="py-32 px-6 max-w-5xl mx-auto text-center">
+      <section id="section-our-story" className="py-32 px-6 max-w-5xl mx-auto text-center">
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -433,7 +469,7 @@ export default function Home() {
       </section>
 
       {/* Why J Atelier */}
-      <section className="py-24 bg-primary text-primary-foreground">
+      <section id="section-why" className="py-24 bg-primary text-primary-foreground">
         <div className="max-w-7xl mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -469,7 +505,7 @@ export default function Home() {
       </section>
 
       {/* Customer Reviews */}
-      <section className="py-24 px-6 max-w-7xl mx-auto">
+      <section id="section-reviews" className="py-24 px-6 max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -503,7 +539,7 @@ export default function Home() {
       </section>
 
       {/* Gallery */}
-      <section className="py-16 px-6 max-w-7xl mx-auto">
+      <section id="section-gallery" className="py-16 px-6 max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -514,28 +550,39 @@ export default function Home() {
           <h2 className="font-serif text-4xl">As Worn</h2>
         </motion.div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
-          {GALLERY.map((src, i) => (
-            <motion.div
-              key={i}
-              custom={i}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              className="aspect-square overflow-hidden group"
-            >
+          {gallery.map((item, i) => {
+            const content = (
               <img
-                src={src}
-                alt="Gallery"
+                src={item.image_path}
+                alt={item.alt_text || "As Worn Gallery"}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
               />
-            </motion.div>
-          ))}
+            );
+            return (
+              <motion.div
+                key={item.id}
+                custom={i}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={fadeUp}
+                className="aspect-square overflow-hidden group cursor-pointer"
+              >
+                {item.instagram_url ? (
+                  <a href={item.instagram_url} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
+                    {content}
+                  </a>
+                ) : (
+                  content
+                )}
+              </motion.div>
+            );
+          })}
         </div>
       </section>
 
       {/* Newsletter */}
-      <section className="py-24 bg-secondary">
+      <section id="section-newsletter" className="py-24 bg-secondary">
         <div className="max-w-2xl mx-auto px-6 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -565,6 +612,8 @@ export default function Home() {
           </motion.div>
         </div>
       </section>
+
+
 
       <Footer />
     </div>

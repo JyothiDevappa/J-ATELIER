@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
@@ -8,12 +9,71 @@ import { Footer } from "@/components/Footer";
 type Tab = "login" | "register" | "otp";
 
 export default function Login() {
-  const [tab, setTab] = useState<Tab>("login");
+  const [tab, setTab] = useState<Tab>(() => {
+    return window.location.hash === "#register" ? "register" : "login";
+  });
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === "#register") {
+        setTab("register");
+      } else if (window.location.hash === "#login") {
+        setTab("login");
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    handleHashChange();
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
   const [showPass, setShowPass] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const { login, register } = useAuth();
+  const [, setLocation] = useLocation();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regConfirm, setRegConfirm] = useState("");
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await login({ email, password });
+      setLocation("/");
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.response?.data?.errors?.email?.[0] || "Invalid credentials.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await register({
+        name: `${firstName} ${lastName}`.trim(),
+        email: regEmail,
+        password: regPassword,
+        password_confirmation: regConfirm,
+      });
+      setLocation("/");
+    } catch (err: any) {
+      const firstError = Object.values(err.response?.data?.errors || {})[0] as string[];
+      setError(firstError?.[0] || err.response?.data?.message || "Registration failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
   const handleOtpChange = (val: string, i: number) => {
     const newOtp = [...otp];
     newOtp[i] = val.slice(-1);
@@ -55,13 +115,19 @@ export default function Login() {
                   {(["login", "register"] as Tab[]).map((t) => (
                     <button
                       key={t}
-                      onClick={() => setTab(t)}
+                      onClick={() => { setTab(t); setError(null); }}
                       className={`text-xs uppercase tracking-widest pb-2 border-b-2 transition-colors ${tab === t ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
                       data-testid={`tab-${t}`}
                     >
                       {t === "login" ? "Sign In" : "Create Account"}
                     </button>
                   ))}
+                </div>
+              )}
+
+              {error && (
+                <div className="mb-4 p-3 bg-destructive/10 text-destructive text-xs border border-destructive/20 text-center">
+                  {error}
                 </div>
               )}
 
@@ -72,7 +138,7 @@ export default function Login() {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 10 }}
-                    onSubmit={(e) => e.preventDefault()}
+                    onSubmit={handleLogin}
                     className="space-y-5"
                   >
                     <div>
@@ -94,7 +160,9 @@ export default function Login() {
                       </label>
                       <Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground transition-colors" data-testid="link-forgot-password">Forgot password?</Link>
                     </div>
-                    <button type="submit" className="w-full bg-primary text-primary-foreground py-4 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors" data-testid="button-login">Sign In</button>
+                    <button type="submit" disabled={loading} className="w-full bg-primary text-primary-foreground py-4 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors disabled:opacity-50" data-testid="button-login">
+                      {loading ? "Signing in..." : "Sign In"}
+                    </button>
                     <button type="button" onClick={() => setTab("otp")} className="w-full border border-border/40 py-4 text-xs uppercase tracking-widest hover:border-accent transition-colors" data-testid="button-otp-login">Sign In with OTP</button>
                     <div className="relative text-center">
                       <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border/20" /></div>
@@ -113,36 +181,38 @@ export default function Login() {
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
-                    onSubmit={(e) => e.preventDefault()}
+                    onSubmit={handleRegister}
                     className="space-y-5"
                   >
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">First Name</label>
-                        <input type="text" required className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-register-first-name" />
+                        <input type="text" required value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-register-first-name" />
                       </div>
                       <div>
                         <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Last Name</label>
-                        <input type="text" required className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-register-last-name" />
+                        <input type="text" required value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-register-last-name" />
                       </div>
                     </div>
                     <div>
                       <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Email Address</label>
-                      <input type="email" required className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-register-email" />
+                      <input type="email" required value={regEmail} onChange={(e) => setRegEmail(e.target.value)} className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-register-email" />
                     </div>
                     <div>
                       <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Password</label>
-                      <input type="password" required className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-register-password" />
+                      <input type="password" required value={regPassword} onChange={(e) => setRegPassword(e.target.value)} className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-register-password" />
                     </div>
                     <div>
                       <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Confirm Password</label>
-                      <input type="password" required className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-register-confirm-password" />
+                      <input type="password" required value={regConfirm} onChange={(e) => setRegConfirm(e.target.value)} className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-register-confirm-password" />
                     </div>
                     <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
                       <input type="checkbox" required className="w-3.5 h-3.5 mt-0.5" data-testid="checkbox-terms" />
                       <span>I agree to the <Link href="/terms" className="underline hover:text-foreground">Terms of Service</Link> and <Link href="/privacy" className="underline hover:text-foreground">Privacy Policy</Link></span>
                     </label>
-                    <button type="submit" className="w-full bg-primary text-primary-foreground py-4 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors" data-testid="button-register">Create Account</button>
+                    <button type="submit" disabled={loading} className="w-full bg-primary text-primary-foreground py-4 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors disabled:opacity-50" data-testid="button-register">
+                      {loading ? "Creating Account..." : "Create Account"}
+                    </button>
                   </motion.form>
                 )}
 

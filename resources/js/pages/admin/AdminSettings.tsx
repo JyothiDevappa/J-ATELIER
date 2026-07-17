@@ -1,8 +1,127 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AdminLayout } from "./AdminLayout";
+import { useStoreSetting } from "@/context/StoreSettingContext";
+import { toast } from "@/hooks/use-toast";
+import { StoreSettings, SecurityPayload, updateSecurity } from "@/lib/settingsApi";
 
 export default function AdminSettings() {
   const [tab, setTab] = useState<"general" | "shipping" | "notifications" | "security">("general");
+  const { settings, updateSettings } = useStoreSetting();
+
+  // Local form state for the General tab
+  const [form, setForm] = useState<StoreSettings>({
+    store_name: settings.store_name,
+    store_url: settings.store_url,
+    support_email: settings.support_email,
+    currency: settings.currency,
+  });
+  const [saving, setSaving] = useState(false);
+
+  // Sync form when context settings load/change
+  useEffect(() => {
+    setForm({
+      store_name: settings.store_name,
+      store_url: settings.store_url,
+      support_email: settings.support_email,
+      currency: settings.currency,
+    });
+  }, [settings]);
+
+  const handleChange = (key: keyof StoreSettings, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateSettings(form);
+      toast({ title: "Settings saved", description: "Store information has been updated." });
+    } catch (err: any) {
+      toast({
+        title: "Failed to save",
+        description: err?.response?.data?.message ?? err?.message ?? "An error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Local form state for the Security tab
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [updatingSecurity, setUpdatingSecurity] = useState(false);
+
+  const handleSaveSecurity = async () => {
+    if (!currentPassword) {
+      toast({
+        title: "Current Password Required",
+        description: "Please enter your current password to authenticate the change.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const wantsEmail    = newEmail.trim().length > 0;
+    const wantsPassword = newPassword.length > 0;
+
+    if (!wantsEmail && !wantsPassword) {
+      toast({
+        title: "Nothing to Update",
+        description: "Please enter a new email, a new password, or both.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (wantsEmail && newEmail !== confirmEmail) {
+      toast({
+        title: "Email Mismatch",
+        description: "The email confirmation does not match the new email.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (wantsPassword && newPassword !== confirmPassword) {
+      toast({
+        title: "Password Mismatch",
+        description: "The password confirmation does not match the new password.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUpdatingSecurity(true);
+    try {
+      const payload: SecurityPayload = { current_password: currentPassword };
+      if (wantsEmail)    { payload.new_email = newEmail; payload.confirm_email = confirmEmail; }
+      if (wantsPassword) { payload.new_password = newPassword; payload.confirm_password = confirmPassword; }
+
+      const result = await updateSecurity(payload);
+      toast({
+        title: "Security updated",
+        description: result.message ?? "Your administrator credentials have been updated.",
+      });
+      // Clear all fields after success
+      setCurrentPassword("");
+      setNewEmail("");
+      setConfirmEmail("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      toast({
+        title: "Failed to update security",
+        description: err?.response?.data?.message ?? err?.message ?? "An error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingSecurity(false);
+    }
+  };
 
   const tabs = [
     { id: "general", label: "General" },
@@ -10,6 +129,13 @@ export default function AdminSettings() {
     { id: "notifications", label: "Notifications" },
     { id: "security", label: "Security" },
   ] as const;
+
+  const generalFields: { label: string; key: keyof StoreSettings; type?: string }[] = [
+    { label: "Store Name",    key: "store_name" },
+    { label: "Store URL",     key: "store_url" },
+    { label: "Support Email", key: "support_email", type: "email" },
+    { label: "Currency",      key: "currency" },
+  ];
 
   return (
     <AdminLayout>
@@ -35,22 +161,28 @@ export default function AdminSettings() {
         {tab === "general" && (
           <div className="bg-card p-8 space-y-6 max-w-2xl">
             <h2 className="font-serif text-xl">Store Information</h2>
-            {[
-              { label: "Store Name", defaultValue: "J Atelier" },
-              { label: "Store URL", defaultValue: "jatelier.com" },
-              { label: "Support Email", defaultValue: "hello@jatelier.com" },
-              { label: "Currency", defaultValue: "USD" },
-            ].map((field) => (
-              <div key={field.label}>
-                <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">{field.label}</label>
+            {generalFields.map((field) => (
+              <div key={field.key}>
+                <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">
+                  {field.label}
+                </label>
                 <input
-                  defaultValue={field.defaultValue}
+                  type={field.type ?? "text"}
+                  value={form[field.key]}
+                  onChange={(e) => handleChange(field.key, e.target.value)}
                   className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
                   data-testid={`input-setting-${field.label.toLowerCase().replace(/\s+/g, "-")}`}
                 />
               </div>
             ))}
-            <button className="bg-primary text-primary-foreground px-8 py-3 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors" data-testid="button-save-general">Save Changes</button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-primary text-primary-foreground px-8 py-3 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors disabled:opacity-50"
+              data-testid="button-save-general"
+            >
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
           </div>
         )}
 
@@ -106,18 +238,79 @@ export default function AdminSettings() {
         {tab === "security" && (
           <div className="bg-card p-8 space-y-6 max-w-2xl">
             <h2 className="font-serif text-xl">Security Settings</h2>
+
+            {/* ─── Authentication proof ─── */}
             <div>
               <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Current Password</label>
-              <input type="password" className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-current-password" />
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Required to authorise any change"
+                className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors placeholder:text-muted-foreground/30"
+                data-testid="input-current-password"
+              />
             </div>
-            <div>
-              <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">New Password</label>
-              <input type="password" className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-new-password" />
+
+            {/* ─── Update Login Email ─── */}
+            <div className="pt-2 border-t border-border/20">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-4">Update Login Email — leave blank to keep current</p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">New Email Address</label>
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="e.g. newadmin@example.com"
+                    className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors placeholder:text-muted-foreground/30"
+                    data-testid="input-new-email"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Confirm New Email</label>
+                  <input
+                    type="email"
+                    value={confirmEmail}
+                    onChange={(e) => setConfirmEmail(e.target.value)}
+                    placeholder="Re-enter new email"
+                    className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors placeholder:text-muted-foreground/30"
+                    data-testid="input-confirm-email"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Confirm New Password</label>
-              <input type="password" className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-confirm-password" />
+
+            {/* ─── Update Password ─── */}
+            <div className="pt-2 border-t border-border/20">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/60 mb-4">Update Password — leave blank to keep current</p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Minimum 8 characters"
+                    className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors placeholder:text-muted-foreground/30"
+                    data-testid="input-new-password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                    className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors placeholder:text-muted-foreground/30"
+                    data-testid="input-confirm-password"
+                  />
+                </div>
+              </div>
             </div>
+
+            {/* ─── 2FA placeholder ─── */}
             <div className="pt-4 border-t border-border/20">
               <label className="flex items-start gap-3 cursor-pointer mb-4">
                 <input type="checkbox" className="w-4 h-4 mt-0.5" data-testid="checkbox-2fa" />
@@ -127,7 +320,15 @@ export default function AdminSettings() {
                 </div>
               </label>
             </div>
-            <button className="bg-primary text-primary-foreground px-8 py-3 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors" data-testid="button-save-security">Update Security</button>
+
+            <button
+              onClick={handleSaveSecurity}
+              disabled={updatingSecurity}
+              className="bg-primary text-primary-foreground px-8 py-3 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors disabled:opacity-50"
+              data-testid="button-save-security"
+            >
+              {updatingSecurity ? "Updating…" : "Update Security"}
+            </button>
           </div>
         )}
       </div>

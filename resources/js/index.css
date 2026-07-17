@@ -234,6 +234,87 @@
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   J ATELIER — PREMIUM SCROLLBAR
+   Philosophy: Invisible when idle, architectural when noticed.
+   • 4 px wide — barely there, never intrusive
+   • Sharp edges (border-radius: 0) — mirrors the brand's zero-radius design token
+   • Track: warm off-white tinted border tone — dissolves into the background
+   • Thumb: Charcoal (#2B2B2B) at rest → Warm Brown accent (#8C6A56) on hover
+   • Dark mode: Warm Cream thumb → same Warm Brown accent on hover
+   • scrollbar-gutter: stable — prevents layout shift on overflow toggle
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Modern Firefox / future spec ── */
+:root {
+  /* light: charcoal thumb on warm-border track */
+  scrollbar-color: hsl(0 0% 17% / 0.55) hsl(30 20% 82% / 0.35);
+  scrollbar-width: thin;
+}
+
+.dark {
+  /* dark: warm-cream thumb on deep-black track */
+  scrollbar-color: hsl(36 33% 92% / 0.45) hsl(0 0% 14% / 0.6);
+  scrollbar-width: thin;
+}
+
+/* ── WebKit (Chrome, Safari, Edge) ── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;          /* horizontal scrollbars */
+}
+
+/* Track — warm, ghosted, barely visible */
+::-webkit-scrollbar-track {
+  background: hsl(30 20% 82% / 0.30);
+  border-radius: 0;     /* sharp — consistent with --radius: 0rem */
+}
+
+/* Thumb — Charcoal, semitransparent at rest */
+::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 17% / 0.50);
+  border-radius: 0;
+  border: none;
+  transition: background 0.25s ease;
+}
+
+/* Hover — elevates to Warm Brown accent */
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(22 24% 44% / 0.85);
+}
+
+/* Active (dragging) — full-opacity Warm Brown */
+::-webkit-scrollbar-thumb:active {
+  background: hsl(22 24% 44%);
+}
+
+/* Corner where horizontal + vertical meet */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ── Dark mode overrides ── */
+.dark ::-webkit-scrollbar-track {
+  background: hsl(0 0% 14% / 0.55);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: hsl(36 33% 92% / 0.35);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: hsl(22 24% 44% / 0.80);
+}
+
+.dark ::-webkit-scrollbar-thumb:active {
+  background: hsl(22 24% 44%);
+}
+
+/* ── Prevent layout shift on pages that toggle overflow ── */
+html {
+  scrollbar-gutter: stable;
+}
+
 @layer utilities {
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;

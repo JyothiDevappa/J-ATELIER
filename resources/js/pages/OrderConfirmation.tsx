@@ -5,7 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 
 export default function OrderConfirmation() {
-  const orderNumber = `JA-${Math.floor(100000 + Math.random() * 900000)}`;
+  const orderNumber = typeof window !== 'undefined' ? (sessionStorage.getItem("last_order_number") || `JA-${Math.floor(100000 + Math.random() * 900000)}`) : `JA-${Math.floor(100000 + Math.random() * 900000)}`;
   const estimatedDelivery = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB", {
     weekday: "long",
     month: "long",

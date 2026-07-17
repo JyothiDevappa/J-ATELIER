@@ -1,18 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { User, Package, Heart, MapPin, Settings, ChevronRight } from "lucide-react";
+import { User, Package, Heart, MapPin, Settings, ChevronRight, LogOut } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useWishlist } from "@/context/WishlistContext";
+import { useAuth } from "@/context/AuthContext";
+import { getAddresses, createAddress, updateAddress, deleteAddress, setDefaultAddress, Address } from "@/lib/addressApi";
+import { getOrders, Order } from "@/lib/checkoutApi";
+import { toast } from "@/hooks/use-toast";
 
 type Tab = "overview" | "orders" | "wishlist" | "addresses" | "settings";
-
-const MOCK_ORDERS = [
-  { id: "JA-483921", date: "12 January 2024", status: "Delivered", total: 295, items: ["The Cashmere Blend Pullover"] },
-  { id: "JA-471203", date: "28 November 2023", status: "Delivered", total: 510, items: ["The Classic Oversized Pullover", "The Kangaroo Pocket Essential"] },
-  { id: "JA-460891", date: "3 October 2023", status: "Delivered", total: 265, items: ["The Cloud Oversized Pullover"] },
-];
 
 const STATUS_COLORS: Record<string, string> = {
   Delivered: "text-accent",
@@ -23,6 +21,176 @@ const STATUS_COLORS: Record<string, string> = {
 export default function Profile() {
   const [tab, setTab] = useState<Tab>("overview");
   const { items: wishlistItems } = useWishlist();
+  const { user, logout, updateProfile } = useAuth();
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [addressesLoading, setAddressesLoading] = useState(true);
+
+  // Address form states
+  const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [addressForm, setAddressForm] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    postcode: "",
+    country: "United Kingdom",
+    is_default: false
+  });
+
+  // Settings states
+  const [settingsForm, setSettingsForm] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    password: ""
+  });
+  const [settingsSaving, setSettingsSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setSettingsForm({
+        first_name: user.name ? user.name.split(" ")[0] : "",
+        last_name: user.name ? user.name.split(" ").slice(1).join(" ") : "",
+        email: user.email || "",
+        password: ""
+      });
+    }
+  }, [user]);
+
+  const loadAddresses = async () => {
+    try {
+      const data = await getAddresses();
+      setAddresses(data);
+    } catch (error) {
+      console.error("Failed to load addresses:", error);
+    } finally {
+      setAddressesLoading(false);
+    }
+  };
+
+  const loadOrders = async () => {
+    try {
+      const data = await getOrders();
+      setOrders(data);
+    } catch (error) {
+      console.error("Failed to load orders:", error);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAddresses();
+    loadOrders();
+  }, []);
+
+  const handleSaveAddress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingAddressId !== null) {
+        const updated = await updateAddress(editingAddressId, addressForm);
+        setAddresses(addresses.map(addr => addr.id === editingAddressId ? updated : addr));
+        toast({ title: "Address updated successfully" });
+      } else {
+        const created = await createAddress(addressForm);
+        if (addressForm.is_default || addresses.length === 0) {
+          await loadAddresses();
+        } else {
+          setAddresses([...addresses, created]);
+        }
+        toast({ title: "Address created successfully" });
+      }
+      setShowAddressForm(false);
+      setEditingAddressId(null);
+    } catch (error: any) {
+      toast({
+        title: "Failed to save address",
+        description: error.response?.data?.message || error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEditAddressClick = (addr: Address) => {
+    setEditingAddressId(addr.id);
+    setAddressForm({
+      first_name: addr.first_name,
+      last_name: addr.last_name,
+      email: addr.email,
+      phone: addr.phone,
+      address: addr.address,
+      city: addr.city,
+      postcode: addr.postcode,
+      country: addr.country,
+      is_default: addr.is_default
+    });
+    setShowAddressForm(true);
+  };
+
+  const handleDeleteAddress = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this address?")) return;
+    try {
+      await deleteAddress(id);
+      await loadAddresses();
+      toast({ title: "Address deleted successfully" });
+    } catch (error: any) {
+      toast({
+        title: "Failed to delete address",
+        description: error.response?.data?.message || error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSetDefault = async (id: number) => {
+    try {
+      await setDefaultAddress(id);
+      await loadAddresses();
+      toast({ title: "Default address updated" });
+    } catch (error: any) {
+      toast({
+        title: "Failed to set default address",
+        description: error.response?.data?.message || error.message,
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    setSettingsSaving(true);
+    try {
+      const fullName = `${settingsForm.first_name} ${settingsForm.last_name}`.trim();
+      await updateProfile({
+        name: fullName,
+        email: settingsForm.email,
+        password: settingsForm.password || undefined
+      });
+      toast({ title: "Profile updated successfully" });
+    } catch (error: any) {
+      toast({
+        title: "Failed to update profile",
+        description: error.response?.data?.message || error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+  };
 
   const navItems = [
     { id: "overview", label: "Overview", icon: User },
@@ -47,10 +215,12 @@ export default function Profile() {
             <aside className="lg:col-span-1">
               <div className="bg-card p-6 mb-4">
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-serif text-xl">J</div>
+                  <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-primary-foreground font-serif text-xl" data-testid="profile-avatar">
+                    {user?.name ? user.name[0].toUpperCase() : "U"}
+                  </div>
                   <div>
-                    <p className="text-sm font-medium">Jane Atelier</p>
-                    <p className="text-xs text-muted-foreground">jane@example.com</p>
+                    <p className="text-sm font-medium" data-testid="profile-username">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground" data-testid="profile-email">{user?.email}</p>
                   </div>
                 </div>
                 <nav className="space-y-1">
@@ -65,6 +235,16 @@ export default function Profile() {
                       {label}
                     </button>
                   ))}
+                  <div className="pt-4 border-t border-border/20 mt-4">
+                    <button
+                      onClick={logout}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                      data-testid="button-profile-logout"
+                    >
+                      <LogOut className="w-4 h-4" strokeWidth={1.5} />
+                      Logout
+                    </button>
+                  </div>
                 </nav>
               </div>
             </aside>
@@ -81,9 +261,9 @@ export default function Profile() {
                   <div className="space-y-6">
                     <div className="grid grid-cols-3 gap-4">
                       {[
-                        { label: "Total Orders", value: MOCK_ORDERS.length },
+                        { label: "Total Orders", value: orders.length },
                         { label: "Wishlist Items", value: wishlistItems.length },
-                        { label: "Member Since", value: "2023" },
+                        { label: "Member Since", value: user?.created_at ? new Date(user.created_at).getFullYear().toString() : "2026" },
                       ].map((stat) => (
                         <div key={stat.label} className="bg-card p-6 text-center">
                           <p className="font-serif text-3xl mb-1">{stat.value}</p>
@@ -93,20 +273,26 @@ export default function Profile() {
                     </div>
                     <div className="bg-card p-6">
                       <h3 className="font-serif text-lg mb-4">Recent Orders</h3>
-                      <div className="space-y-4">
-                        {MOCK_ORDERS.slice(0, 2).map((order) => (
-                          <div key={order.id} className="flex items-center justify-between py-3 border-b border-border/20 last:border-0">
-                            <div>
-                              <p className="text-sm font-medium">{order.id}</p>
-                              <p className="text-xs text-muted-foreground">{order.date}</p>
+                      {ordersLoading ? (
+                        <p className="text-sm text-muted-foreground">Loading recent orders...</p>
+                      ) : orders.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No recent orders found.</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {orders.slice(0, 2).map((order) => (
+                            <div key={order.id} className="flex items-center justify-between py-3 border-b border-border/20 last:border-0">
+                              <div>
+                                <p className="text-sm font-medium">{order.order_number}</p>
+                                <p className="text-xs text-muted-foreground">{formatDate(order.created_at)}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className={`text-xs ${STATUS_COLORS[order.status] || "text-foreground"}`}>{order.status}</p>
+                                <p className="text-sm">${parseFloat(order.total.toString()).toFixed(2)}</p>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className={`text-xs ${STATUS_COLORS[order.status] || "text-foreground"}`}>{order.status}</p>
-                              <p className="text-sm">${order.total}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                       <button onClick={() => setTab("orders")} className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors mt-4 flex items-center gap-1" data-testid="link-all-orders">View All <ChevronRight className="w-3 h-3" /></button>
                     </div>
                   </div>
@@ -115,26 +301,42 @@ export default function Profile() {
                 {tab === "orders" && (
                   <div className="space-y-4">
                     <h2 className="font-serif text-2xl mb-6">Order History</h2>
-                    {MOCK_ORDERS.map((order) => (
-                      <div key={order.id} className="bg-card p-6" data-testid={`order-${order.id}`}>
-                        <div className="flex items-start justify-between mb-4">
-                          <div>
-                            <p className="text-sm font-medium mb-1">{order.id}</p>
-                            <p className="text-xs text-muted-foreground">{order.date}</p>
-                          </div>
-                          <div className="text-right">
-                            <span className={`text-xs uppercase tracking-widest ${STATUS_COLORS[order.status] || "text-foreground"}`}>{order.status}</span>
-                          </div>
-                        </div>
-                        <div className="space-y-1 mb-4">
-                          {order.items.map((item) => <p key={item} className="text-sm text-muted-foreground">{item}</p>)}
-                        </div>
-                        <div className="flex justify-between items-center pt-4 border-t border-border/20">
-                          <p className="text-sm font-medium">${order.total}</p>
-                          <button className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors" data-testid={`button-reorder-${order.id}`}>Reorder</button>
-                        </div>
+                    {ordersLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading order history...</p>
+                    ) : orders.length === 0 ? (
+                      <div className="text-center py-16 bg-card">
+                        <Package className="w-8 h-8 text-muted-foreground mx-auto mb-4" strokeWidth={1} />
+                        <p className="text-sm text-muted-foreground mb-4">You have not placed any orders yet.</p>
+                        <Link href="/shop" className="text-xs uppercase tracking-widest underline hover:text-accent transition-colors">Start Shopping</Link>
                       </div>
-                    ))}
+                    ) : (
+                      orders.map((order) => (
+                        <div key={order.id} className="bg-card p-6" data-testid={`order-${order.order_number}`}>
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <p className="text-sm font-medium mb-1">{order.order_number}</p>
+                              <p className="text-xs text-muted-foreground">{formatDate(order.created_at)}</p>
+                            </div>
+                            <div className="text-right">
+                              <span className={`text-xs uppercase tracking-widest ${STATUS_COLORS[order.status] || "text-foreground"}`}>{order.status}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-1 mb-4">
+                            {order.items.map((item) => (
+                              <p key={item.id} className="text-sm text-muted-foreground">
+                                {item.product?.name || "Premium Item"} ({item.color} · {item.size}) x {item.quantity}
+                              </p>
+                            ))}
+                          </div>
+                          <div className="flex justify-between items-center pt-4 border-t border-border/20">
+                            <p className="text-sm font-medium">${parseFloat(order.total.toString()).toFixed(2)}</p>
+                            <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                              {order.delivery_method} delivery
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 )}
 
@@ -164,22 +366,201 @@ export default function Profile() {
                 {tab === "addresses" && (
                   <div>
                     <h2 className="font-serif text-2xl mb-6">Saved Addresses</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                      <div className="bg-card p-6 border-2 border-foreground/20">
-                        <div className="flex justify-between items-start mb-4">
-                          <span className="text-[10px] uppercase tracking-widest text-accent">Default</span>
-                          <button className="text-xs text-muted-foreground hover:text-foreground transition-colors" data-testid="button-edit-address-1">Edit</button>
+                    
+                    {showAddressForm ? (
+                      <form onSubmit={handleSaveAddress} className="bg-card p-8 space-y-6">
+                        <h3 className="font-serif text-lg mb-4">{editingAddressId ? "Edit Address" : "Add New Address"}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">First Name</label>
+                            <input
+                              required
+                              value={addressForm.first_name}
+                              onChange={(e) => setAddressForm({ ...addressForm, first_name: e.target.value })}
+                              className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                              data-testid="input-address-first-name"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Last Name</label>
+                            <input
+                              required
+                              value={addressForm.last_name}
+                              onChange={(e) => setAddressForm({ ...addressForm, last_name: e.target.value })}
+                              className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                              data-testid="input-address-last-name"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Email Address</label>
+                            <input
+                              required
+                              type="email"
+                              value={addressForm.email}
+                              onChange={(e) => setAddressForm({ ...addressForm, email: e.target.value })}
+                              className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                              data-testid="input-address-email"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Phone Number</label>
+                            <input
+                              required
+                              value={addressForm.phone}
+                              onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
+                              className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                              data-testid="input-address-phone"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Street Address</label>
+                            <input
+                              required
+                              value={addressForm.address}
+                              onChange={(e) => setAddressForm({ ...addressForm, address: e.target.value })}
+                              className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                              data-testid="input-address-street"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">City</label>
+                            <input
+                              required
+                              value={addressForm.city}
+                              onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                              className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                              data-testid="input-address-city"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Postcode</label>
+                            <input
+                              required
+                              value={addressForm.postcode}
+                              onChange={(e) => setAddressForm({ ...addressForm, postcode: e.target.value })}
+                              className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                              data-testid="input-address-postcode"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Country</label>
+                            <select
+                              value={addressForm.country}
+                              onChange={(e) => setAddressForm({ ...addressForm, country: e.target.value })}
+                              className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent cursor-pointer"
+                              data-testid="select-address-country"
+                            >
+                              {["United Kingdom", "United States", "France", "Germany", "Italy", "Spain", "Australia", "Canada"].map((c) => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="flex items-center gap-3 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={addressForm.is_default}
+                                onChange={(e) => setAddressForm({ ...addressForm, is_default: e.target.checked })}
+                                className="w-4 h-4"
+                                data-testid="checkbox-address-default"
+                              />
+                              <span className="text-sm">Set as default address</span>
+                            </label>
+                          </div>
                         </div>
-                        <p className="text-sm font-medium mb-1">Jane Atelier</p>
-                        <p className="text-sm text-muted-foreground">12 Mayfair Street</p>
-                        <p className="text-sm text-muted-foreground">London, W1K 3AF</p>
-                        <p className="text-sm text-muted-foreground">United Kingdom</p>
+                        <div className="flex gap-4">
+                          <button
+                            type="submit"
+                            className="bg-primary text-primary-foreground px-8 py-3 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors"
+                            data-testid="button-save-address"
+                          >
+                            Save Address
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setShowAddressForm(false); setEditingAddressId(null); }}
+                            className="border border-border/40 px-8 py-3 text-xs uppercase tracking-widest hover:border-foreground transition-colors"
+                            data-testid="button-cancel-address"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        {addressesLoading ? (
+                          <p className="text-sm text-muted-foreground col-span-2">Loading addresses...</p>
+                        ) : addresses.length === 0 ? (
+                          <div className="col-span-2 text-center py-8 bg-card border-2 border-dashed border-border/20">
+                            <p className="text-sm text-muted-foreground">No saved addresses found.</p>
+                          </div>
+                        ) : (
+                          addresses.map((addr) => (
+                            <div
+                              key={addr.id}
+                              className={`bg-card p-6 border-2 relative ${addr.is_default ? 'border-foreground/20' : 'border-border/10'}`}
+                              data-testid={`address-card-${addr.id}`}
+                            >
+                              <div className="flex justify-between items-start mb-4">
+                                {addr.is_default ? (
+                                  <span className="text-[10px] uppercase tracking-widest text-accent">Default</span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleSetDefault(addr.id)}
+                                    className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+                                    data-testid={`button-set-default-address-${addr.id}`}
+                                  >
+                                    Set as Default
+                                  </button>
+                                )}
+                                <div className="flex gap-3">
+                                  <button
+                                    onClick={() => handleEditAddressClick(addr)}
+                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                    data-testid={`button-edit-address-${addr.id}`}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteAddress(addr.id)}
+                                    className="text-xs text-destructive hover:text-destructive/80 transition-colors"
+                                    data-testid={`button-delete-address-${addr.id}`}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-sm font-medium mb-1">{addr.first_name} {addr.last_name}</p>
+                              <p className="text-sm text-muted-foreground">{addr.address}</p>
+                              <p className="text-sm text-muted-foreground">{addr.city}, {addr.postcode}</p>
+                              <p className="text-sm text-muted-foreground">{addr.country}</p>
+                            </div>
+                          ))
+                        )}
+                        <button
+                          onClick={() => {
+                            setEditingAddressId(null);
+                            setAddressForm({
+                              first_name: "",
+                              last_name: "",
+                              email: user?.email || "",
+                              phone: "",
+                              address: "",
+                              city: "",
+                              postcode: "",
+                              country: "United Kingdom",
+                              is_default: false
+                            });
+                            setShowAddressForm(true);
+                          }}
+                          className="bg-card p-6 border-2 border-dashed border-border/40 flex flex-col items-center justify-center gap-3 hover:border-accent transition-colors group"
+                          data-testid="button-add-address"
+                        >
+                          <span className="w-8 h-8 border border-border/40 flex items-center justify-center group-hover:border-accent transition-colors text-lg text-muted-foreground">+</span>
+                          <span className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Add New Address</span>
+                        </button>
                       </div>
-                      <button className="bg-card p-6 border-2 border-dashed border-border/40 flex flex-col items-center justify-center gap-3 hover:border-accent transition-colors group" data-testid="button-add-address">
-                        <span className="w-8 h-8 border border-border/40 flex items-center justify-center group-hover:border-accent transition-colors text-lg text-muted-foreground">+</span>
-                        <span className="text-xs uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">Add New Address</span>
-                      </button>
-                    </div>
+                    )}
                   </div>
                 )}
 
@@ -190,23 +571,53 @@ export default function Profile() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">First Name</label>
-                          <input defaultValue="Jane" className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-settings-first-name" />
+                          <input
+                            value={settingsForm.first_name}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, first_name: e.target.value })}
+                            className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                            data-testid="input-settings-first-name"
+                          />
                         </div>
                         <div>
                           <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Last Name</label>
-                          <input defaultValue="Atelier" className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-settings-last-name" />
+                          <input
+                            value={settingsForm.last_name}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, last_name: e.target.value })}
+                            className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                            data-testid="input-settings-last-name"
+                          />
                         </div>
                       </div>
                       <div>
                         <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Email Address</label>
-                        <input defaultValue="jane@example.com" type="email" className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-settings-email" />
+                        <input
+                          value={settingsForm.email}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, email: e.target.value })}
+                          type="email"
+                          className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                          data-testid="input-settings-email"
+                        />
                       </div>
                       <div>
                         <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">New Password</label>
-                        <input type="password" placeholder="Leave blank to keep current" className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors" data-testid="input-settings-password" />
+                        <input
+                          value={settingsForm.password}
+                          onChange={(e) => setSettingsForm({ ...settingsForm, password: e.target.value })}
+                          type="password"
+                          placeholder="Leave blank to keep current"
+                          className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent transition-colors"
+                          data-testid="input-settings-password"
+                        />
                       </div>
                       <div className="pt-4">
-                        <button className="bg-primary text-primary-foreground px-8 py-3 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors" data-testid="button-save-settings">Save Changes</button>
+                        <button
+                          onClick={handleSaveSettings}
+                          disabled={settingsSaving}
+                          className="bg-primary text-primary-foreground px-8 py-3 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors disabled:opacity-50"
+                          data-testid="button-save-settings"
+                        >
+                          {settingsSaving ? "Saving..." : "Save Changes"}
+                        </button>
                       </div>
                     </div>
                     <div className="mt-6 bg-card p-8">

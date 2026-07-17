@@ -1,9 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { ChevronRight, Lock } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { useCart } from "@/context/CartContext";
+import { submitCheckout } from "@/lib/checkoutApi";
+import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { getAddresses, Address } from "@/lib/addressApi";
+import { validateCoupon, CouponValidationResult } from "@/lib/couponApi";
 
 const DELIVERY_OPTIONS = [
   { id: "standard", label: "Standard Delivery", time: "3–5 business days", price: 15 },
@@ -13,17 +18,142 @@ const DELIVERY_OPTIONS = [
 
 export default function Checkout() {
   const [, setLocation] = useLocation();
-  const { items, cartTotal } = useCart();
+  const { items, cartTotal, clearCart } = useCart();
+  const { user } = useAuth();
+  
   const [delivery, setDelivery] = useState("standard");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", address: "", city: "", postcode: "", country: "United Kingdom" });
   const [card, setCard] = useState({ number: "", name: "", expiry: "", cvv: "" });
+  
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      setForm((f) => ({ ...f, email: user.email || "" }));
+      getAddresses().then((data) => {
+        setAddresses(data);
+        const defaultAddr = data.find((a) => a.is_default);
+        if (defaultAddr) {
+          setSelectedAddressId(defaultAddr.id);
+          setForm({
+            firstName: defaultAddr.first_name,
+            lastName: defaultAddr.last_name,
+            email: defaultAddr.email,
+            phone: defaultAddr.phone,
+            address: defaultAddr.address,
+            city: defaultAddr.city,
+            postcode: defaultAddr.postcode,
+            country: defaultAddr.country,
+          });
+        } else if (data.length > 0) {
+          setSelectedAddressId(data[0].id);
+          setForm({
+            firstName: data[0].first_name,
+            lastName: data[0].last_name,
+            email: data[0].email,
+            phone: data[0].phone,
+            address: data[0].address,
+            city: data[0].city,
+            postcode: data[0].postcode,
+            country: data[0].country,
+          });
+        }
+      }).catch((err) => {
+        console.error("Failed to fetch user addresses:", err);
+      });
+    }
+  }, [user]);
+
+  const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
+
+  useEffect(() => {
+    const code = sessionStorage.getItem("applied_coupon_code");
+    if (code) {
+      setCouponCode(code);
+      validateCoupon(code)
+        .then((res) => {
+          setAppliedCoupon(res);
+        })
+        .catch((err) => {
+          console.error("Failed to validate checkout coupon:", err);
+          sessionStorage.removeItem("applied_coupon_code");
+          setCouponCode(null);
+        });
+    }
+  }, []);
+
+  const handleAddressSelect = (id: number | 'new') => {
+    if (id === 'new') {
+      setSelectedAddressId(null);
+      setForm({
+        firstName: "",
+        lastName: "",
+        email: user?.email || "",
+        phone: "",
+        address: "",
+        city: "",
+        postcode: "",
+        country: "United Kingdom",
+      });
+    } else {
+      const addr = addresses.find((a) => a.id === id);
+      if (addr) {
+        setSelectedAddressId(addr.id);
+        setForm({
+          firstName: addr.first_name,
+          lastName: addr.last_name,
+          email: addr.email,
+          phone: addr.phone,
+          address: addr.address,
+          city: addr.city,
+          postcode: addr.postcode,
+          country: addr.country,
+        });
+      }
+    }
+  };
 
   const selectedDelivery = DELIVERY_OPTIONS.find((d) => d.id === delivery)!;
-  const total = cartTotal + selectedDelivery.price;
+  const discount = appliedCoupon ? appliedCoupon.discount_amount : 0;
+  const total = Math.max(0, cartTotal - discount) + selectedDelivery.price;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLocation("/order-confirmation");
+    if (items.length === 0) {
+      toast({ title: "Cart is empty", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await submitCheckout({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        phone: form.phone,
+        address: form.address,
+        city: form.city,
+        postcode: form.postcode,
+        country: form.country,
+        delivery: delivery,
+        couponCode: couponCode || undefined,
+      });
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem("last_order_number", res.order_number);
+      }
+      clearCart();
+      setLocation("/order-confirmation");
+    } catch (err: any) {
+      toast({
+        title: "Checkout failed",
+        description: err.response?.data?.message || err.message || "An error occurred during checkout",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -47,6 +177,38 @@ export default function Checkout() {
                 {/* Shipping Address */}
                 <section>
                   <h2 className="font-serif text-2xl mb-8">Shipping Address</h2>
+
+                  {addresses.length > 0 && (
+                    <div className="mb-8 space-y-3">
+                      <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Select Saved Address</label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {addresses.map((addr) => (
+                          <div
+                            key={addr.id}
+                            onClick={() => handleAddressSelect(addr.id)}
+                            className={`p-4 border cursor-pointer transition-colors relative ${selectedAddressId === addr.id ? 'border-foreground bg-card' : 'border-border/40 hover:border-accent bg-transparent'}`}
+                            data-testid={`saved-address-option-${addr.id}`}
+                          >
+                            {addr.is_default && (
+                              <span className="absolute top-2 right-2 text-[9px] uppercase tracking-widest bg-accent text-accent-foreground px-1.5 py-0.5">Default</span>
+                            )}
+                            <p className="text-xs font-semibold">{addr.first_name} {addr.last_name}</p>
+                            <p className="text-xs text-muted-foreground">{addr.address}</p>
+                            <p className="text-xs text-muted-foreground">{addr.city}, {addr.postcode}</p>
+                            <p className="text-xs text-muted-foreground">{addr.country}</p>
+                          </div>
+                        ))}
+                        <div
+                          onClick={() => handleAddressSelect('new')}
+                          className={`p-4 border cursor-pointer transition-colors flex items-center justify-center ${selectedAddressId === null ? 'border-foreground bg-card' : 'border-dashed border-border/40 hover:border-accent bg-transparent'}`}
+                          data-testid="new-address-option"
+                        >
+                          <span className="text-xs uppercase tracking-widest text-muted-foreground">+ Use a new address</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
                       { name: "firstName", label: "First Name", col: 1 },
@@ -168,11 +330,12 @@ export default function Checkout() {
 
                 <button
                   type="submit"
-                  className="w-full bg-primary text-primary-foreground py-5 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors flex items-center justify-center gap-3"
+                  disabled={isSubmitting || items.length === 0}
+                  className="w-full bg-primary text-primary-foreground py-5 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   data-testid="button-place-order"
                 >
                   <Lock className="w-3.5 h-3.5" />
-                  Place Order · ${total.toFixed(2)}
+                  {isSubmitting ? "Processing..." : `Place Order · $${total.toFixed(2)}`}
                 </button>
               </div>
 
@@ -198,6 +361,12 @@ export default function Checkout() {
                       <span className="text-muted-foreground">Subtotal</span>
                       <span>${cartTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                     </div>
+                    {discount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-accent">Discount ({appliedCoupon?.type === 'Percentage' ? `${appliedCoupon.value}%` : `$${appliedCoupon?.value}`})</span>
+                        <span className="text-accent">−${discount.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Delivery</span>
                       <span>${selectedDelivery.price}</span>

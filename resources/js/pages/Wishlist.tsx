@@ -10,9 +10,15 @@ export default function Wishlist() {
   const { items, toggleWishlist } = useWishlist();
   const { addToCart } = useCart();
 
-  const handleMoveToCart = (product: typeof items[0]) => {
-    addToCart(product, product.colors[0].label, product.sizes[0], 1);
-    toggleWishlist(product);
+  const handleMoveToCart = async (product: typeof items[0]) => {
+    if (!product.inStock || product.stock <= 0) return;
+
+    try {
+      await addToCart(product, product.colors[0]?.name || "", product.sizes[0], 1);
+      toggleWishlist(product);
+    } catch {
+      // Keep the item in the wishlist when the cart request fails.
+    }
   };
 
   return (
@@ -65,10 +71,11 @@ export default function Wishlist() {
                     <p className="text-xs text-muted-foreground mb-3">${product.price.toLocaleString()}</p>
                     <button
                       onClick={() => handleMoveToCart(product)}
-                      className="w-full border border-border/40 py-2.5 text-[10px] uppercase tracking-widest hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-2"
+                      disabled={!product.inStock || product.stock <= 0}
+                      className={`w-full border border-border/40 py-2.5 text-[10px] uppercase tracking-widest transition-colors flex items-center justify-center gap-2 ${(!product.inStock || product.stock <= 0) ? 'text-muted-foreground cursor-not-allowed' : 'hover:border-accent hover:text-accent'}`}
                       data-testid={`button-move-to-cart-${product.id}`}
                     >
-                      <ShoppingBag className="w-3.5 h-3.5" strokeWidth={1.5} /> Move to Cart
+                      <ShoppingBag className="w-3.5 h-3.5" strokeWidth={1.5} /> {product.inStock && product.stock > 0 ? 'Move to Cart' : 'Unavailable'}
                     </button>
                   </motion.div>
                 ))}

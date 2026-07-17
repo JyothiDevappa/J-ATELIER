@@ -1,11 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSearch } from "wouter";
 import { motion } from "framer-motion";
 import { SlidersHorizontal, LayoutGrid, List, X, ChevronDown } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
-import { products, Product } from "@/data/products";
+import { type Product } from "@/types/product";
+import { useProducts } from "@/hooks/useProducts";
+import { fetchColors } from "@/lib/productApi";
 
 const COLLECTIONS = [
   { label: "All", value: "" },
@@ -16,7 +18,7 @@ const COLLECTIONS = [
   { label: "Limited Edition", value: "limited-edition" },
 ];
 
-const COLORS = ["Ivory", "Black", "Mocha", "Olive"];
+
 const SIZES = ["XS", "S", "M", "L"] as const;
 const SORT_OPTIONS = [
   { label: "Featured", value: "featured" },
@@ -29,6 +31,7 @@ const SORT_OPTIONS = [
 const PAGE_SIZE = 12;
 
 export default function Shop() {
+  const { products, loading } = useProducts();
   const search = useSearch();
   const params = new URLSearchParams(search);
   const [collection, setCollection] = useState(params.get("collection") || "");
@@ -40,10 +43,24 @@ export default function Shop() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  const [dbColors, setDbColors] = useState<{ id: number; name: string; hex: string }[]>([]);
+
+  useEffect(() => {
+    const loadColors = async () => {
+      try {
+        const data = await fetchColors();
+        setDbColors(data);
+      } catch (err) {
+        console.error("Failed to load shop colors", err);
+      }
+    };
+    loadColors();
+  }, []);
+
   const filtered = useMemo(() => {
     let list = [...products];
     if (collection) list = list.filter((p) => p.collection === collection);
-    if (color) list = list.filter((p) => p.colors.some((c) => c.label.toLowerCase() === color.toLowerCase()));
+    if (color) list = list.filter((p) => p.colors.some((c) => c.name.toLowerCase() === color.toLowerCase()));
     if (size) list = list.filter((p) => p.sizes.includes(size as "XS" | "S" | "M" | "L"));
     if (query) list = list.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
     switch (sort) {
@@ -53,7 +70,7 @@ export default function Shop() {
       case "rating": return list.sort((a, b) => b.rating - a.rating);
       default: return list;
     }
-  }, [collection, color, size, sort, query]);
+  }, [collection, color, size, sort, query, products]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -139,15 +156,22 @@ export default function Shop() {
                 {/* Color */}
                 <div>
                   <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-4">Color</p>
-                  <div className="flex flex-wrap gap-2">
-                    {COLORS.map((c) => (
+                  <div className="flex flex-wrap gap-2.5">
+                    {dbColors.map((c) => (
                       <button
-                        key={c}
-                        onClick={() => { setColor(color === c ? "" : c); setPage(1); }}
-                        className={`text-xs px-3 py-1.5 border transition-colors ${color === c ? "border-foreground text-foreground" : "border-border/40 text-muted-foreground hover:border-accent"}`}
-                        data-testid={`filter-color-${c.toLowerCase()}`}
+                        key={c.id}
+                        onClick={() => { setColor(color === c.name ? "" : c.name); setPage(1); }}
+                        className={`w-6 h-6 rounded-full border transition-all duration-300 relative group flex items-center justify-center ${
+                          color === c.name ? "ring-1 ring-foreground ring-offset-2 scale-110" : "border-border/40 hover:scale-105"
+                        }`}
+                        style={{ backgroundColor: c.hex }}
+                        data-testid={`filter-color-${c.name.toLowerCase()}`}
+                        title={c.name}
+                        aria-label={`Filter by ${c.name}`}
                       >
-                        {c}
+                        <span className="absolute bottom-full mb-2 hidden group-hover:block bg-background border border-border px-2 py-1 text-[10px] whitespace-nowrap z-10 shadow-sm">
+                          {c.name}
+                        </span>
                       </button>
                     ))}
                   </div>

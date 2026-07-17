@@ -1,18 +1,66 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowRight, ShoppingBag } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useCart } from "@/context/CartContext";
+import { validateCoupon, CouponValidationResult } from "@/lib/couponApi";
+import { toast } from "@/hooks/use-toast";
 
 export default function Cart() {
-  const { items, removeFromCart, updateQuantity, cartTotal } = useCart();
+  const { items, removeFromCart, updateQuantity, cartTotal, isLoading, error } = useCart();
   const [coupon, setCoupon] = useState("");
-  const [couponApplied, setCouponApplied] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  // Sync applied coupon if cartTotal changes (re-validate subtotal & limits)
+  useEffect(() => {
+    if (appliedCoupon) {
+      validateCoupon(appliedCoupon.code)
+        .then((res) => {
+          setAppliedCoupon(res);
+          setCouponError(null);
+        })
+        .catch((err) => {
+          setAppliedCoupon(null);
+          setCouponError(err.response?.data?.message || "Coupon is no longer valid.");
+        });
+    }
+  }, [cartTotal]);
+
+  // Sync applied coupon code to sessionStorage for Checkout page
+  useEffect(() => {
+    if (appliedCoupon) {
+      sessionStorage.setItem("applied_coupon_code", appliedCoupon.code);
+    } else {
+      sessionStorage.removeItem("applied_coupon_code");
+    }
+    return () => {
+      // Don't clear on unmount so checkout can access it
+    };
+  }, [appliedCoupon]);
+
+  const handleApplyCoupon = async () => {
+    if (!coupon) return;
+    setCouponError(null);
+    try {
+      const res = await validateCoupon(coupon);
+      setAppliedCoupon(res);
+      toast({ title: "Coupon applied successfully" });
+    } catch (err: any) {
+      setAppliedCoupon(null);
+      setCouponError(err.response?.data?.message || "Failed to apply coupon.");
+      toast({
+        title: "Coupon invalid",
+        description: err.response?.data?.message || "Failed to apply coupon.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const shipping = cartTotal > 300 ? 0 : 15;
-  const discount = couponApplied ? cartTotal * 0.1 : 0;
+  const discount = appliedCoupon ? appliedCoupon.discount_amount : 0;
   const total = cartTotal - discount + shipping;
   const estimatedDelivery = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toLocaleDateString("en-GB", { weekday: "long", month: "long", day: "numeric" });
 
@@ -26,7 +74,15 @@ export default function Cart() {
             <h1 className="font-serif text-4xl md:text-5xl">Shopping Cart</h1>
           </div>
 
-          {items.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-32">
+              <p className="font-serif text-2xl text-muted-foreground">Loading your cart...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-32">
+              <p className="font-serif text-2xl text-muted-foreground">{error}</p>
+            </div>
+          ) : items.length === 0 ? (
             <div className="text-center py-32">
               <ShoppingBag className="w-12 h-12 text-muted-foreground mx-auto mb-6" strokeWidth={1} />
               <p className="font-serif text-2xl text-muted-foreground mb-4">Your cart is empty</p>
@@ -112,14 +168,23 @@ export default function Cart() {
                         data-testid="input-coupon"
                       />
                       <button
-                        onClick={() => coupon && setCouponApplied(true)}
+                        type="button"
+                        onClick={handleApplyCoupon}
                         className="bg-primary text-primary-foreground px-4 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors"
                         data-testid="button-apply-coupon"
                       >
                         Apply
                       </button>
                     </div>
-                    {couponApplied && <p className="text-xs text-accent mt-2">10% discount applied</p>}
+                    {couponError && <p className="text-xs text-destructive mt-2" data-testid="coupon-error">{couponError}</p>}
+                    {appliedCoupon && (
+                      <div className="flex items-center justify-between text-xs text-accent mt-2">
+                        <span>
+                          Coupon "{appliedCoupon.code}" ({appliedCoupon.type === 'Percentage' ? `${appliedCoupon.value}%` : `$${appliedCoupon.value}`} discount) applied
+                        </span>
+                        <button type="button" onClick={() => setAppliedCoupon(null)} className="underline hover:text-foreground">Remove</button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-4 mb-8">
@@ -129,7 +194,7 @@ export default function Cart() {
                     </div>
                     {discount > 0 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-accent">Discount (10%)</span>
+                        <span className="text-accent">Discount ({appliedCoupon?.type === 'Percentage' ? `${appliedCoupon.value}%` : `$${appliedCoupon?.value}`})</span>
                         <span className="text-accent">−${discount.toFixed(2)}</span>
                       </div>
                     )}

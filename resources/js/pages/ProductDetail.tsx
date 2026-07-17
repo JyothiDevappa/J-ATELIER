@@ -1,38 +1,99 @@
-import { useState, useEffect } from "react";
-import { useParams, Link } from "wouter";
+import { useState, useEffect, useMemo } from "react";
+import { useParams, Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Heart, Star, ChevronDown, ArrowLeft, ZoomIn } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
-import { getProductById, products, Product } from "@/data/products";
+import { products as staticProducts } from "@/data/products";
+import { type Product } from "@/types/product";
+import { useProducts } from "@/hooks/useProducts";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { useRecentlyViewed } from "@/context/RecentlyViewedContext";
 
+const colorMap: Record<string, string> = {
+  "Ivory": "#F5F0E8",
+  "Black": "#1A1A1A",
+  "Mocha": "#8C6A56",
+  "Olive": "#5C5C3D",
+  "Pink": "#F4A7B9",
+  "Sky Blue": "#87CEEB",
+  "Grey": "#8E8E93",
+  "Dark Pink": "#C24F6C",
+  "Taupe": "#8B8579",
+  "Clove Green": "#5C5C3D",
+  "Brown": "#8C6A56",
+  "Blue": "#4A90E2",
+  "Light Blue": "#ADD8E6"
+};
+
+const getProductColorName = (name: string) => {
+  const parts = name.split(" – ");
+  if (parts.length > 1) return parts[parts.length - 1].trim();
+  const hyphenParts = name.split(" - ");
+  if (hyphenParts.length > 1) return hyphenParts[hyphenParts.length - 1].trim();
+  return "Ivory";
+};
+
 export default function ProductDetail() {
-  const params = useParams<{ id: string }>();
-  const product = getProductById(params.id || "");
+  const params = useParams<{ slug: string }>();
+  const [, setLocation] = useLocation();
+  const { products, loading } = useProducts();
+  const isNumeric = params.slug && /^\d+$/.test(params.slug);
+  const product = products.find((p) => isNumeric ? p.id === Number(params.slug) : p.slug === params.slug);
+
   const { addToCart } = useCart();
   const { toggleWishlist, isInWishlist } = useWishlist();
   const { addToRecentlyViewed, items: recentlyViewed } = useRecentlyViewed();
 
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedColor, setSelectedColor] = useState(product?.colors[0]);
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [quantity, setQuantity] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
   const [openAccordion, setOpenAccordion] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState(false);
 
+  const availableStock = product?.stock ?? 0;
+  const isOutOfStock = !product?.inStock || availableStock <= 0;
+
+  const selectedColor = product?.colors[0];
+
   useEffect(() => {
     if (product) {
       addToRecentlyViewed(product);
-      setSelectedColor(product.colors[0]);
       setSelectedImage(0);
       setSelectedSize("");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [product?.id]);
+
+  const siblings = useMemo(() => {
+    if (!product) return [];
+    return products.filter((p) => p.collection === product.collection);
+  }, [product?.collection, products]);
+
+  const swatches = useMemo(() => {
+    return siblings.map((sibling) => {
+      const siblingColor = sibling.colors[0];
+      return {
+        product: sibling,
+        colorName: siblingColor?.name || getProductColorName(sibling.name),
+        hex: siblingColor?.hex || colorMap[getProductColorName(sibling.name)] || "#CCCCCC"
+      };
+    });
+  }, [siblings]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="pt-32 text-center">
+          <p className="font-serif text-2xl">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -49,11 +110,16 @@ export default function ProductDetail() {
   const wished = isInWishlist(product.id);
   const related = products.filter((p) => p.collection === product.collection && p.id !== product.id).slice(0, 4);
 
-  const handleAddToCart = () => {
-    if (!selectedSize) return;
-    addToCart(product, selectedColor?.label || "", selectedSize, quantity);
-    setAddedToCart(true);
-    setTimeout(() => setAddedToCart(false), 2500);
+  const handleAddToCart = async () => {
+    if (!selectedSize || isOutOfStock) return;
+
+    try {
+      await addToCart(product, selectedColor?.name || "", selectedSize, quantity);
+      setAddedToCart(true);
+      setTimeout(() => setAddedToCart(false), 2500);
+    } catch {
+      setAddedToCart(false);
+    }
   };
 
   const accordionItems = [
@@ -144,17 +210,17 @@ export default function ProductDetail() {
                 {/* Color Selector */}
                 <div className="mb-8">
                   <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3">
-                    Color — <span className="text-foreground">{selectedColor?.label}</span>
+                    Color — <span className="text-foreground">{getProductColorName(product.name)}</span>
                   </p>
                   <div className="flex gap-3">
-                    {product.colors.map((color) => (
+                    {swatches.map((swatch) => (
                       <button
-                        key={color.label}
-                        onClick={() => setSelectedColor(color)}
-                        className={`w-8 h-8 rounded-full border-2 transition-all ${selectedColor?.label === color.label ? "border-foreground scale-110" : "border-transparent"}`}
-                        style={{ backgroundColor: color.hex, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.1)" }}
-                        title={color.label}
-                        data-testid={`button-color-${color.label.toLowerCase()}`}
+                        key={swatch.product.id}
+                        onClick={() => setLocation(`/product/${swatch.product.slug}`)}
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${product.id === swatch.product.id ? "border-foreground scale-110" : "border-transparent"}`}
+                        style={{ backgroundColor: swatch.hex, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.1)" }}
+                        title={swatch.colorName}
+                        data-testid={`button-color-${swatch.colorName.toLowerCase().replace(/\s+/g, "-")}`}
                       />
                     ))}
                   </div>
@@ -195,18 +261,18 @@ export default function ProductDetail() {
                 <div className="flex flex-col gap-3 mb-10">
                   <motion.button
                     onClick={handleAddToCart}
-                    disabled={!selectedSize}
+                    disabled={!selectedSize || isOutOfStock}
                     whileTap={{ scale: 0.98 }}
                     className={`w-full py-4 text-xs uppercase tracking-widest transition-all duration-300 ${
                       addedToCart
                         ? "bg-accent text-accent-foreground"
-                        : selectedSize
-                        ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                        : "bg-muted text-muted-foreground cursor-not-allowed"
+                        : !selectedSize || isOutOfStock
+                        ? "bg-muted text-muted-foreground cursor-not-allowed"
+                        : "bg-primary text-primary-foreground hover:bg-primary/90"
                     }`}
                     data-testid="button-add-to-cart"
                   >
-                    {addedToCart ? "Added to Cart" : "Add to Cart"}
+                    {isOutOfStock ? "Out of Stock" : addedToCart ? "Added to Cart" : "Add to Cart"}
                   </motion.button>
                   <button
                     onClick={() => toggleWishlist(product)}
@@ -260,7 +326,7 @@ export default function ProductDetail() {
           <div className="mt-24 pt-16 border-t border-border/20">
             <h2 className="font-serif text-3xl mb-12">Customer Reviews</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {product.reviews.map((review, i) => (
+              {(product.reviews || staticProducts.find(p => p.id === product.id)?.reviews || []).map((review, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 20 }}

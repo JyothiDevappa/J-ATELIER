@@ -28,4 +28,54 @@ export default defineConfig({
       ignored: ["**/storage/framework/views/**"],
     },
   },
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // React core + scheduler (must stay together to avoid circular deps)
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/scheduler/")
+          ) {
+            return "vendor-react";
+          }
+          // Framer Motion
+          if (id.includes("node_modules/framer-motion/")) {
+            return "vendor-framer-motion";
+          }
+          // Radix UI primitives (the biggest contributor to vendor-misc)
+          if (id.includes("node_modules/@radix-ui/")) {
+            return "vendor-radix";
+          }
+          // Recharts + d3 (chart library)
+          if (
+            id.includes("node_modules/recharts/") ||
+            id.includes("node_modules/d3") ||
+            id.includes("node_modules/victory-vendor/")
+          ) {
+            return "vendor-charts";
+          }
+          // TanStack React Query
+          if (id.includes("node_modules/@tanstack/")) {
+            return "vendor-tanstack";
+          }
+          // Lucide icons
+          if (id.includes("node_modules/lucide-react/")) {
+            return "vendor-lucide";
+          }
+          // Wouter router
+          if (id.includes("node_modules/wouter/")) {
+            return "vendor-wouter";
+          }
+          // Everything else (clsx, tailwind-merge, zod, date-fns, etc.)
+          if (id.includes("node_modules/")) {
+            return "vendor-misc";
+          }
+        },
+      },
+    },
+  },
 });
+

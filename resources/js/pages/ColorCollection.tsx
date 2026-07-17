@@ -3,19 +3,18 @@ import { motion } from "framer-motion";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
-import { getProductsByColor } from "@/data/products";
+import { useProducts } from "@/hooks/useProducts";
 
 const COLOR_META: Record<string, { label: string; hex: string; description: string }> = {
   ivory: { label: "Ivory", hex: "#F5F0E8", description: "Warm, soft, and endlessly versatile. Our Ivory palette is built on the tone of untouched natural fibres." },
   black: { label: "Black", hex: "#1A1A1A", description: "Not the black of absence, but the black of intention. Deep, matte, and permanently relevant." },
-  mocha: { label: "Mocha", hex: "#8C6A56", description: "Drawn from earth and espresso. A warm brown that lives at the intersection of nature and warmth." },
-  olive: { label: "Olive", hex: "#5C5C3D", description: "Quiet and grounded. The colour of late-season light filtering through leaves — understated and timeless." },
 };
 
 export default function ColorCollection() {
   const params = useParams<{ color: string }>();
   const slug = params.color?.toLowerCase() || "";
   const meta = COLOR_META[slug];
+  const { getProductsByColor, loading } = useProducts();
   const colorProducts = getProductsByColor(slug);
 
   if (!meta) {
@@ -63,7 +62,11 @@ export default function ColorCollection() {
             </p>
           </div>
 
-          {colorProducts.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-24">
+              <p className="font-serif text-2xl text-muted-foreground">Loading...</p>
+            </div>
+          ) : colorProducts.length === 0 ? (
             <div className="text-center py-24">
               <p className="font-serif text-2xl text-muted-foreground">No pieces available in this color.</p>
             </div>

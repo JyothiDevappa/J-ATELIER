@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, ArrowRight } from "lucide-react";
-import { products } from "@/data/products";
+import { useProducts } from "@/hooks/useProducts";
 
 interface SearchOverlayProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface SearchOverlayProps {
 }
 
 export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
+  const { products } = useProducts();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -122,6 +123,9 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                                 </div>
                                 <p className="font-serif text-sm mb-1 group-hover:text-accent transition-colors">{product.name}</p>
                                 <p className="text-xs text-muted-foreground">${product.price}</p>
+                                {(!product.inStock || product.stock <= 0) && (
+                                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground mt-1">Out of Stock</p>
+                                )}
                               </div>
                             </Link>
                           </motion.div>
@@ -167,7 +171,7 @@ export function SearchOverlay({ isOpen, onClose }: SearchOverlayProps) {
                   <div>
                     <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-5">Popular Searches</p>
                     <div className="flex flex-wrap gap-3">
-                      {["Cashmere", "Oversized", "Limited Edition", "Zip-Up", "Silk", "New Arrivals"].map((term) => (
+                      {["Oversized", "Limited Edition", "Zip-Up", "New Arrivals"].map((term) => (
                         <button
                           key={term}
                           onClick={() => setQuery(term)}

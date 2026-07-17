@@ -5,10 +5,22 @@ import { ShoppingBag, Heart, User, Menu, X, Search } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { SearchOverlay } from "@/components/SearchOverlay";
+import { useAuth } from "@/context/AuthContext";
+import { useStoreSetting } from "@/context/StoreSettingContext";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 export function Navbar() {
   const { items: cartItems } = useCart();
   const { items: wishlistItems } = useWishlist();
+  const { user, isAuthenticated, logout } = useAuth();
+  const { settings } = useStoreSetting();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -75,7 +87,7 @@ export function Navbar() {
             className="absolute left-1/2 -translate-x-1/2 font-serif text-2xl tracking-[0.25em] hover:text-accent transition-colors duration-300"
             data-testid="link-home"
           >
-            J ATELIER
+            {(settings.store_name ?? 'J Atelier').toUpperCase()}
           </Link>
 
           <div className="flex items-center gap-5">
@@ -87,9 +99,51 @@ export function Navbar() {
             >
               <Search strokeWidth={1.5} style={{ width: "18px", height: "18px" }} />
             </button>
-            <Link href="/profile" className="p-1.5 hover:text-accent transition-colors hidden md:block" data-testid="link-profile" aria-label="Profile">
-              <User strokeWidth={1.5} style={{ width: "18px", height: "18px" }} />
-            </Link>
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-1.5 hover:text-accent transition-colors hidden md:block" data-testid="link-profile" aria-label="Profile options">
+                    <User strokeWidth={1.5} style={{ width: "18px", height: "18px" }} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-background border border-border/40 p-2 shadow-lg z-50">
+                  <DropdownMenuLabel className="font-serif text-sm px-2 py-1.5 truncate">
+                    {user?.name}
+                    <p className="text-[10px] text-muted-foreground font-sans lowercase truncate">{user?.email}</p>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-border/20" />
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="w-full flex items-center px-2 py-2 text-xs uppercase tracking-wider hover:bg-accent/10 transition-colors cursor-pointer" data-testid="link-dropdown-profile">
+                      My Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-border/20" />
+                  <DropdownMenuItem onClick={logout} className="w-full flex items-center px-2 py-2 text-xs uppercase tracking-wider hover:bg-destructive/10 text-destructive focus:text-destructive transition-colors cursor-pointer" data-testid="button-logout">
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-1.5 hover:text-accent transition-colors hidden md:block" data-testid="link-profile" aria-label="Profile options">
+                    <User strokeWidth={1.5} style={{ width: "18px", height: "18px" }} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 bg-background border border-border/40 p-2 shadow-lg z-50">
+                  <DropdownMenuItem asChild>
+                    <Link href="/login" className="w-full flex items-center px-2 py-2 text-xs uppercase tracking-wider hover:bg-accent/10 transition-colors cursor-pointer" data-testid="link-dropdown-login">
+                      Sign In
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/login#register" className="w-full flex items-center px-2 py-2 text-xs uppercase tracking-wider hover:bg-accent/10 transition-colors cursor-pointer" data-testid="link-dropdown-register">
+                      Create Account
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Link href="/wishlist" className="p-1.5 hover:text-accent transition-colors relative hidden md:block" data-testid="link-wishlist" aria-label="Wishlist">
               <Heart strokeWidth={1.5} style={{ width: "18px", height: "18px" }} />
               {wishlistItems.length > 0 && (
@@ -138,7 +192,18 @@ export function Navbar() {
                 Search
               </button>
               <div className="border-t border-border/20 pt-8 flex flex-col gap-4">
-                <Link href="/profile" className="text-sm uppercase tracking-widest hover:text-accent transition-colors">Account</Link>
+                {isAuthenticated ? (
+                  <>
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{user?.name}</span>
+                    <Link href="/profile" className="text-sm uppercase tracking-widest hover:text-accent transition-colors" data-testid="link-mobile-profile">My Profile</Link>
+                    <button onClick={() => { logout(); setMobileOpen(false); }} className="text-sm uppercase tracking-widest hover:text-destructive text-destructive text-left transition-colors" data-testid="button-mobile-logout">Logout</button>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/login" className="text-sm uppercase tracking-widest hover:text-accent transition-colors" data-testid="link-mobile-login">Sign In</Link>
+                    <Link href="/login#register" className="text-sm uppercase tracking-widest hover:text-accent transition-colors" data-testid="link-mobile-register">Create Account</Link>
+                  </>
+                )}
                 <Link href="/wishlist" className="text-sm uppercase tracking-widest hover:text-accent transition-colors">Wishlist</Link>
                 <Link href="/cart" className="text-sm uppercase tracking-widest hover:text-accent transition-colors">Cart ({itemCount})</Link>
               </div>
