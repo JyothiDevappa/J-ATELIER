@@ -38,7 +38,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {NAV.map(({ href, label, icon: Icon }) => {
-            const active = location === href || (href !== "/admin" && location.startsWith(href)) || (href === "/admin/products" && (location === "/admin/shop-by-color" || location === "/admin/instagram-gallery"));
+            const active = location === href || (href !== "/admin" && location.startsWith(href)) || (href === "/admin/products" && (location === "/admin/colors" || location === "/admin/shop-by-color" || location === "/admin/instagram-gallery"));
             const isProducts = label === "Products";
             
             return (
@@ -67,6 +67,16 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                       }`}
                     >
                       Products
+                    </Link>
+                    <Link
+                      href="/admin/colors"
+                      className={`block py-1.5 text-xs transition-colors ${
+                        location === "/admin/colors"
+                          ? "text-sidebar-accent-foreground font-semibold"
+                          : "text-sidebar-foreground/50 hover:text-sidebar-foreground/80"
+                      }`}
+                    >
+                      Manage Colors
                     </Link>
                     <Link
                       href="/admin/shop-by-color"

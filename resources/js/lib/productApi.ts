@@ -60,7 +60,21 @@ export const fetchColors = async (): Promise<{ id: number; name: string; hex: st
   return response.data;
 };
 
+export const fetchAdminColors = async (): Promise<{ id: number; name: string; hex: string; products_count?: number }[]> => {
+  const response = await axios.get('/admin/colors');
+  return response.data;
+};
+
 export const createColor = async (color: { name: string; hex: string }): Promise<{ id: number; name: string; hex: string }> => {
   const response = await axios.post('/admin/colors', color);
   return response.data;
+};
+
+export const updateColor = async (id: number, color: { name: string; hex: string }): Promise<{ id: number; name: string; hex: string }> => {
+  const response = await axios.put(`/admin/colors/${id}`, color);
+  return response.data;
+};
+
+export const deleteColor = async (id: number): Promise<void> => {
+  await axios.delete(`/admin/colors/${id}`);
 };

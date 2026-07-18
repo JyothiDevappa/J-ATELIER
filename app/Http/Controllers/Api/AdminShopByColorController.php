@@ -14,7 +14,8 @@ class AdminShopByColorController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $colors = Color::withCount('products')
+        $colors = Color::whereHas('products')
+            ->withCount('products')
             ->orderBy('homepage_sort_order')
             ->orderBy('name')
             ->get();

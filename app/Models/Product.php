@@ -169,9 +169,29 @@ class Product extends Model
 
         // 3. Update overall product stock
         $totalStock = $this->variants()->sum('stock');
+
+        if ($this->in_stock) {
+            $variantsCount = $this->variants()->count();
+            if ($variantsCount > 0) {
+                $productStock = $this->stock > 0 ? $this->stock : 10;
+                if ($totalStock === 0) {
+                    $stockPerVariant = (int)ceil($productStock / $variantsCount);
+                    $this->variants()->update(['stock' => $stockPerVariant]);
+                    $totalStock = $this->variants()->sum('stock');
+                }
+                if ($this->stock <= 0) {
+                    $this->stock = $productStock;
+                }
+            }
+        } else {
+            $this->variants()->update(['stock' => 0]);
+            $totalStock = 0;
+            $this->stock = 0;
+        }
+
         $this->update([
-            'stock' => $totalStock,
-            'in_stock' => $totalStock > 0
+            'stock' => $this->stock ?? $totalStock,
+            'in_stock' => $this->in_stock
         ]);
     }
 }

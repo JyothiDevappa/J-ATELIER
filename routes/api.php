@@ -62,7 +62,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/admin/products/{product:id}', [ProductController::class, 'update']);
         Route::delete('/admin/products/{product:id}', [ProductController::class, 'destroy']);
         Route::post('/admin/products/upload-image', [ProductController::class, 'uploadImage']);
-        Route::post('/admin/colors', [ProductController::class, 'colorsStore']);
+        Route::get('/admin/colors', [\App\Http\Controllers\Api\AdminColorController::class, 'index']);
+        Route::post('/admin/colors', [\App\Http\Controllers\Api\AdminColorController::class, 'store']);
+        Route::put('/admin/colors/{color}', [\App\Http\Controllers\Api\AdminColorController::class, 'update']);
+        Route::delete('/admin/colors/{color}', [\App\Http\Controllers\Api\AdminColorController::class, 'destroy']);
 
         // Admin Orders Management
         Route::get('/admin/orders', [\App\Http\Controllers\Api\AdminOrderController::class, 'index']);

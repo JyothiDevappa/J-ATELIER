@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "./AdminLayout";
 import { Plus, Search, Edit2, Trash2, X, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchAdminProducts, createProduct, updateProduct, deleteProduct, uploadProductImage, PaginatedProducts, fetchColors, createColor } from "@/lib/productApi";
+import { fetchAdminProducts, createProduct, updateProduct, deleteProduct, uploadProductImage, PaginatedProducts, fetchAdminColors } from "@/lib/productApi";
 import { clearProductCache } from "@/hooks/useProducts";
 import { Product, ProductColor } from "@/types/product";
 import { toast } from "@/hooks/use-toast";
@@ -47,26 +47,16 @@ export default function AdminProducts() {
   const [availableColors, setAvailableColors] = useState<{ id: number; name: string; hex: string }[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Helper states for the new color management redesign
-  const [showAddNewColorForm, setShowAddNewColorForm] = useState(false);
-  const [newColorName, setNewColorName] = useState("");
-  const [newColorHex, setNewColorHex] = useState("#000000");
-  const [savingNewColor, setSavingNewColor] = useState(false);
-  const [newColorError, setNewColorError] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-
-  // States for "+ Add Product Color"
-  const [showAddProductColorForm, setShowAddProductColorForm] = useState(false);
-  const [selectedColorId, setSelectedColorId] = useState<number | "">("");
-  const [colorSortOrder, setColorSortOrder] = useState<string>("0");
-  const [colorSearchQuery, setColorSearchQuery] = useState("");
-  const [showProductColorSuggestions, setShowProductColorSuggestions] = useState(false);
+  // States for inline color editing
+  const [editingColorIndex, setEditingColorIndex] = useState<number | null>(null);
+  const [replaceColorSearchQuery, setReplaceColorSearchQuery] = useState("");
+  const [showReplaceSuggestions, setShowReplaceSuggestions] = useState(false);
+  const [tempSelectedColor, setTempSelectedColor] = useState<ProductColor | null>(null);
 
   useEffect(() => {
     const loadColors = async () => {
       try {
-        const data = await fetchColors();
+        const data = await fetchAdminColors();
         setAvailableColors(data);
       } catch (err) {
         console.error("Failed to load autocomplete colors", err);
@@ -220,62 +210,30 @@ export default function AdminProducts() {
     }
   };
 
-  const handleSaveNewColor = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newColorName.trim()) {
-      setNewColorError("Color name is required.");
-      return;
+  const handleStartEdit = (index: number, color?: ProductColor) => {
+    setEditingColorIndex(index);
+    if (color) {
+      setReplaceColorSearchQuery(color.name);
+      setTempSelectedColor(color);
+    } else {
+      setReplaceColorSearchQuery("");
+      setTempSelectedColor(null);
     }
-    if (!newColorHex.trim()) {
-      setNewColorError("Hex code is required.");
-      return;
-    }
-
-    setSavingNewColor(true);
-    setNewColorError("");
-
-    try {
-      const savedColor = await createColor({
-        name: newColorName,
-        hex: newColorHex
-      });
-
-      const data = await fetchColors();
-      setAvailableColors(data);
-
-      setForm({
-        ...form,
-        colors: [savedColor]
-      });
-
-      setNewColorName("");
-      setNewColorHex("#000000");
-      setShowAddNewColorForm(false);
-      
-      toast({ title: "New color saved and selected successfully!" });
-    } catch (error: any) {
-      setNewColorError(error.response?.data?.message || "Failed to save color.");
-      toast({
-        title: "Failed to save color",
-        description: error.response?.data?.message || error.message,
-        variant: "destructive"
-      });
-    } finally {
-      setSavingNewColor(false);
-    }
+    setShowReplaceSuggestions(false);
   };
 
-  const handleAddProductColor = () => {
-    if (!selectedColorId) {
-      toast({ title: "Please select a color", variant: "destructive" });
+  const handleSaveProductColor = (index: number) => {
+    if (!tempSelectedColor) {
+      toast({
+        title: "Please select a color",
+        description: "You must choose an existing color from the suggestions.",
+        variant: "destructive"
+      });
       return;
     }
-    const colorId = typeof selectedColorId === "number" ? selectedColorId : parseInt(selectedColorId);
-    const color = availableColors.find(c => c.id === colorId);
-    if (!color) return;
 
     // Check duplicates
-    if (form.colors.some(c => c.id === colorId)) {
+    if (form.colors.some((c, idx) => c.id === tempSelectedColor.id && idx !== index)) {
       toast({
         title: "Color already assigned",
         description: "This color is already added to the product.",
@@ -284,32 +242,24 @@ export default function AdminProducts() {
       return;
     }
 
-    // Check max 4 limit
-    if (form.colors.length >= 4) {
-      toast({
-        title: "Maximum limit reached",
-        description: "You can add a maximum of 4 colors per product.",
-        variant: "destructive"
-      });
-      return;
+    const updatedColors = [...form.colors];
+    if (index === form.colors.length) {
+      // Adding a new color slot
+      updatedColors.push(tempSelectedColor);
+    } else {
+      // Editing existing color
+      updatedColors[index] = tempSelectedColor;
     }
-
-    const sortVal = parseInt(colorSortOrder) || 0;
-    const newColorItem = { ...color, sort_order: sortVal };
-    const updatedColors = [...form.colors, newColorItem];
-    updatedColors.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
 
     setForm({
       ...form,
       colors: updatedColors
     });
 
-    // Reset fields
-    setSelectedColorId("");
-    setColorSearchQuery("");
-    setColorSortOrder("0");
-    setShowAddProductColorForm(false);
-    toast({ title: "Color added to product" });
+    setEditingColorIndex(null);
+    setTempSelectedColor(null);
+    setReplaceColorSearchQuery("");
+    toast({ title: index === form.colors.length ? "Color added to product" : "Product color updated successfully" });
   };
 
   const handleRemoveProductColor = (colorId?: number) => {
@@ -612,314 +562,134 @@ export default function AdminProducts() {
                   {/* Current Product Colors list */}
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Current Product Colors</p>
-                    {form.colors.length === 0 ? (
-                      <p className="text-xs text-muted-foreground italic">No colors assigned to this product.</p>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl">
-                        {form.colors.map((color, i) => (
-                          <div key={color.id || i} className="flex items-center justify-between bg-background/50 border border-border/40 p-2.5 rounded-sm hover:border-border transition-colors">
-                            <div className="flex items-center gap-2.5">
-                              <span 
-                                className="w-4 h-4 rounded-full border border-border/40 flex-shrink-0" 
-                                style={{ backgroundColor: color.hex }} 
-                              />
-                              <span className="text-xs font-medium">{color.name}</span>
-                              {color.sort_order !== undefined && (
-                                <span className="text-[9px] font-mono text-muted-foreground bg-muted/20 px-1.5 py-0.5 rounded">
-                                  Pos: {color.sort_order}
-                                </span>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveProductColor(color.id)}
-                              className="p-1 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
-                              title="Remove Color"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {validationErrors.colors && (
-                    <p className="text-xs text-destructive mt-1">{validationErrors.colors[0]}</p>
-                  )}
-
-                  {/* Add Product Color Actions */}
-                  <div className="pt-2">
-                    {form.colors.length >= 4 ? (
-                      <p className="text-[10px] text-amber-500 font-semibold uppercase tracking-wider">
-                        Maximum limit reached (4 colors assigned). Remove a color to add another.
-                      </p>
-                    ) : (
-                      !showAddProductColorForm && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAddProductColorForm(true);
-                            setSelectedColorId("");
-                            setColorSearchQuery("");
-                            setColorSortOrder("0");
-                          }}
-                          className="text-xs text-accent hover:text-accent/80 font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
-                        >
-                          + Add Product Color
-                        </button>
-                      )
-                    )}
-                  </div>
-
-                  {/* Compact Add Product Color Form */}
-                  {showAddProductColorForm && form.colors.length < 4 && (
-                    <div className="border border-border/40 p-4 bg-background/30 rounded-sm space-y-4">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Product Color</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAddProductColorForm(false);
-                            setSelectedColorId("");
-                            setColorSearchQuery("");
-                          }}
-                          className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Searchable Autocomplete Color Name */}
-                        <div className="relative">
-                          <label className="block text-[9px] uppercase text-muted-foreground mb-1">Color Name</label>
-                          <input
-                            type="text"
-                            value={colorSearchQuery}
-                            onChange={(e) => {
-                              setColorSearchQuery(e.target.value);
-                              setShowProductColorSuggestions(true);
-                            }}
-                            onFocus={() => setShowProductColorSuggestions(true)}
-                            onBlur={() => setTimeout(() => setShowProductColorSuggestions(false), 200)}
-                            placeholder="Search color name..."
-                            className="w-full bg-transparent border border-border/40 px-3 py-2 text-xs focus:outline-none focus:border-accent transition-colors"
-                          />
-                          
-                          {showProductColorSuggestions && colorSearchQuery && (
-                            <div className="absolute z-50 left-0 right-0 mt-1 bg-background border border-border shadow-lg max-h-60 overflow-y-auto rounded-sm">
-                              {availableColors
-                                .filter(col => 
-                                  col.name.toLowerCase().includes(colorSearchQuery.toLowerCase())
-                                )
-                                .map(col => {
-                                  const isAdded = form.colors.some(c => c.id === col.id);
-                                  return (
-                                    <button
-                                      key={col.id}
-                                      type="button"
-                                      disabled={isAdded}
-                                      className={`w-full text-left px-3 py-2 text-xs hover:bg-accent/10 flex items-center justify-between border-b border-border/10 last:border-b-0 ${isAdded ? "opacity-50 cursor-not-allowed bg-muted/10" : ""}`}
-                                      onClick={() => {
-                                        setSelectedColorId(col.id);
-                                        setColorSearchQuery(col.name);
-                                        setShowProductColorSuggestions(false);
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <span className="w-3 h-3 rounded-full border border-border/40" style={{ backgroundColor: col.hex }} />
-                                        <span>{col.name}</span>
-                                      </div>
-                                      {isAdded && <span className="text-[9px] text-muted-foreground uppercase font-mono">Added</span>}
-                                    </button>
-                                  );
-                                })}
-                              {availableColors.filter(col => 
-                                col.name.toLowerCase().includes(colorSearchQuery.toLowerCase())
-                              ).length === 0 && (
-                                <div className="p-3 text-center">
-                                  <p className="text-xs text-muted-foreground italic mb-2">No matching color found in system.</p>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setShowAddNewColorForm(true);
-                                      setNewColorName(colorSearchQuery);
-                                      setNewColorHex("#000000");
-                                      setNewColorError("");
-                                      setShowProductColorSuggestions(false);
+                    {form.colors.length === 0 && editingColorIndex === null ? (
+                      <p className="text-xs text-muted-foreground italic mb-2">No colors assigned to this product.</p>
+                    ) : null}
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+                      {form.colors.map((color, index) => (
+                        <div key={color.id || index} className="contents">
+                          {editingColorIndex === index ? (
+                            <div className="flex items-center justify-between bg-background/50 border border-border/40 p-2 rounded-sm hover:border-border transition-colors">
+                              <div className="flex items-center gap-2 flex-1 relative mr-2">
+                                <span 
+                                  className="w-4 h-4 rounded-full border border-border/40 flex-shrink-0" 
+                                  style={{ backgroundColor: tempSelectedColor?.hex || color.hex || "#CCCCCC" }} 
+                                />
+                                <div className="relative flex-1">
+                                  <input
+                                    type="text"
+                                    value={replaceColorSearchQuery}
+                                    onChange={(e) => {
+                                      setReplaceColorSearchQuery(e.target.value);
+                                      setShowReplaceSuggestions(true);
+                                      const matched = availableColors.find(
+                                        ac => ac.name.toLowerCase() === e.target.value.toLowerCase()
+                                      );
+                                      if (matched) {
+                                        setTempSelectedColor(matched);
+                                      } else {
+                                        setTempSelectedColor(null);
+                                      }
                                     }}
-                                    className="text-xs text-accent hover:underline font-semibold"
-                                  >
-                                    + Create "{colorSearchQuery}" Globally
-                                  </button>
+                                    onFocus={() => setShowReplaceSuggestions(true)}
+                                    onBlur={() => setTimeout(() => setShowReplaceSuggestions(false), 200)}
+                                    placeholder="Search color name..."
+                                    className="w-full bg-background border border-border/40 px-2.5 py-1 text-xs focus:outline-none focus:border-accent"
+                                  />
+                                  
+                                  {showReplaceSuggestions && (
+                                    <div className="absolute z-50 left-0 right-0 mt-1 bg-background border border-border shadow-lg max-h-40 overflow-y-auto rounded-sm">
+                                      {availableColors
+                                        .filter(col => col.name.toLowerCase().includes(replaceColorSearchQuery.toLowerCase()))
+                                        .map(col => {
+                                          const isAdded = form.colors.some((c, idx) => c.id === col.id && idx !== index);
+                                          return (
+                                            <button
+                                              key={col.id}
+                                              type="button"
+                                              disabled={isAdded}
+                                              className={`w-full text-left px-3 py-1.5 text-xs hover:bg-accent/10 flex items-center justify-between border-b border-border/10 last:border-b-0 ${isAdded ? "opacity-50 cursor-not-allowed bg-muted/10" : ""}`}
+                                              onClick={() => {
+                                                if (!isAdded) {
+                                                  setReplaceColorSearchQuery(col.name);
+                                                  setTempSelectedColor(col);
+                                                  setShowReplaceSuggestions(false);
+                                                }
+                                              }}
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full border border-border/40" style={{ backgroundColor: col.hex }} />
+                                                <span>{col.name}</span>
+                                              </div>
+                                              {isAdded && <span className="text-[9px] text-muted-foreground uppercase font-mono">Added</span>}
+                                            </button>
+                                          );
+                                        })}
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveProductColor(index)}
+                                  className="p-1 text-accent hover:text-accent/80 transition-colors font-medium text-sm cursor-pointer"
+                                  title="Save color"
+                                >
+                                  💾
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingColorIndex(null);
+                                    setTempSelectedColor(null);
+                                    setReplaceColorSearchQuery("");
+                                  }}
+                                  className="p-1 text-muted-foreground hover:text-foreground transition-colors font-medium text-sm cursor-pointer"
+                                  title="Cancel"
+                                >
+                                  ✖
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between bg-background/50 border border-border/40 p-2.5 rounded-sm hover:border-border transition-colors">
+                              <div className="flex items-center gap-2.5">
+                                <span 
+                                  className="w-4 h-4 rounded-full border border-border/40 flex-shrink-0" 
+                                  style={{ backgroundColor: color.hex }} 
+                                />
+                                <span className="text-xs font-medium">{color.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEdit(index, color)}
+                                  className="p-1 text-muted-foreground hover:text-accent transition-colors cursor-pointer"
+                                  title="Edit Color"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveProductColor(color.id)}
+                                  className="p-1 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                                  title="Remove Color"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>
-
-                        {/* Selected Swatch Preview and Sort Order */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[9px] uppercase text-muted-foreground mb-1">Swatch</label>
-                            <div className="flex items-center h-9 pl-1">
-                              {selectedColorId ? (
-                                <span 
-                                  className="w-6 h-6 rounded-full border border-border/40"
-                                  style={{ backgroundColor: availableColors.find(c => c.id === selectedColorId)?.hex || "#CCCCCC" }}
-                                />
-                              ) : (
-                                <span className="text-xs text-muted-foreground italic">—</span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-[9px] uppercase text-muted-foreground mb-1">Sort Order</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={colorSortOrder}
-                              onChange={(e) => setColorSortOrder(e.target.value)}
-                              className="w-full bg-transparent border border-border/40 px-3 py-2 text-xs focus:outline-none focus:border-accent transition-colors"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-end gap-2 pt-2 border-t border-border/10">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowAddProductColorForm(false);
-                            setSelectedColorId("");
-                            setColorSearchQuery("");
-                          }}
-                          className="px-3 py-1.5 border border-border/40 hover:bg-muted text-xs uppercase tracking-widest transition-colors rounded-sm cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleAddProductColor}
-                          className="px-3 py-1.5 bg-primary text-primary-foreground hover:bg-primary/95 text-xs uppercase tracking-widest transition-colors rounded-sm cursor-pointer"
-                        >
-                          Add to Product
-                        </button>
-                      </div>
+                      ))}
                     </div>
+                  </div>
+ 
+                  {validationErrors.colors && (
+                    <p className="text-xs text-destructive mt-1">{validationErrors.colors[0]}</p>
                   )}
-
-                  {/* Collapsible Global Add New Color Form Helper */}
-                  <AnimatePresence>
-                    {showAddNewColorForm && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0, marginTop: 0 }}
-                        animate={{ opacity: 1, height: "auto", marginTop: 16 }}
-                        exit={{ opacity: 0, height: 0, marginTop: 0 }}
-                        transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="border-t border-border/30 pt-4 space-y-4 overflow-hidden"
-                      >
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-semibold uppercase tracking-widest text-foreground">Create Global Color Helper</p>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowAddNewColorForm(false);
-                              setNewColorName("");
-                              setNewColorHex("#000000");
-                              setNewColorError("");
-                            }}
-                            className="p-1 hover:bg-muted/20 rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                            aria-label="Close add color panel"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        
-                        {newColorError && (
-                          <p className="text-xs text-destructive">{newColorError}</p>
-                        )}
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-[9px] uppercase text-muted-foreground mb-1">Color Name</label>
-                            <input
-                              type="text"
-                              value={newColorName}
-                              onChange={(e) => setNewColorName(e.target.value)}
-                              placeholder="Glow Green"
-                              className="w-full bg-transparent border border-border/40 px-3 py-2 text-xs focus:outline-none focus:border-accent transition-colors"
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-[9px] uppercase text-muted-foreground mb-1">Hex Color</label>
-                            <div className="flex gap-1.5 items-center">
-                              <input
-                                type="color"
-                                value={newColorHex}
-                                onChange={(e) => setNewColorHex(e.target.value)}
-                                className="w-8 h-8 p-0 border border-border/40 bg-transparent cursor-pointer rounded"
-                              />
-                              <input
-                                type="text"
-                                value={newColorHex}
-                                onChange={(e) => setNewColorHex(e.target.value)}
-                                placeholder="#6BFF00"
-                                className="w-full bg-transparent border border-border/40 px-3 py-2 text-xs focus:outline-none focus:border-accent transition-colors"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            if (!newColorName.trim()) {
-                              setNewColorError("Color name is required.");
-                              return;
-                            }
-                            if (!newColorHex.trim()) {
-                              setNewColorError("Hex code is required.");
-                              return;
-                            }
-                            setSavingNewColor(true);
-                            setNewColorError("");
-                            try {
-                              const savedColor = await createColor({
-                                name: newColorName,
-                                hex: newColorHex
-                              });
-                              const data = await fetchColors();
-                              setAvailableColors(data);
-                              
-                              // Automatically set the newly created color in the selection
-                              setSelectedColorId(savedColor.id);
-                              setColorSearchQuery(savedColor.name);
-                              
-                              setNewColorName("");
-                              setNewColorHex("#000000");
-                              setShowAddNewColorForm(false);
-                              setShowAddProductColorForm(true); // Ensure form stays open
-                              
-                              toast({ title: "New color created successfully! You can now add it to the product." });
-                            } catch (err: any) {
-                              setNewColorError(err.response?.data?.message || "Failed to save color.");
-                            } finally {
-                              setSavingNewColor(false);
-                            }
-                          }}
-                          disabled={savingNewColor}
-                          className="bg-primary text-primary-foreground border border-border/40 px-4 py-2 text-xs uppercase tracking-widest hover:border-foreground hover:bg-background/25 transition-colors disabled:opacity-50"
-                        >
-                          {savingNewColor ? "Creating..." : "Create Color"}
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </div>
 
                 {/* Images Manager */}
@@ -1033,15 +803,17 @@ export default function AdminProducts() {
                       <p className="text-xs text-destructive mt-1">{validationErrors.stock[0]}</p>
                     )}
                   </div>
-                  <label className="flex items-center gap-2 cursor-pointer text-xs uppercase tracking-widest">
-                    <input
-                      type="checkbox"
-                      checked={form.in_stock}
-                      onChange={(e) => setForm({ ...form, in_stock: e.target.checked })}
-                      className="w-4 h-4"
-                    />
-                    <span>In Stock</span>
-                  </label>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Stock Status</label>
+                    <select
+                      value={form.in_stock ? "true" : "false"}
+                      onChange={(e) => setForm({ ...form, in_stock: e.target.value === "true" })}
+                      className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent cursor-pointer"
+                    >
+                      <option value="true">In Stock</option>
+                      <option value="false">Out of Stock</option>
+                    </select>
+                  </div>
                   
                   <label className="flex items-center gap-2 cursor-pointer text-xs uppercase tracking-widest">
                     <input

@@ -13,6 +13,7 @@ export default function AdminShopByColor() {
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalSearchQuery, setModalSearchQuery] = useState("");
+  const [colorToRemove, setColorToRemove] = useState<number | null>(null);
 
   const loadColors = async () => {
     try {
@@ -59,6 +60,10 @@ export default function AdminShopByColor() {
   };
 
   const handleRemoveColor = (id: number) => {
+    setColorToRemove(id);
+  };
+
+  const confirmRemoveColor = (id: number) => {
     setActiveColors(prev => {
       const filtered = prev.filter(c => c.id !== id);
       // Re-index sort orders sequentially
@@ -143,18 +148,25 @@ export default function AdminShopByColor() {
             <p className="text-sm text-muted-foreground">Manage colors featured in the homepage curated palettes section</p>
           </div>
           
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                setShowAddModal(true);
-                setModalSearchQuery("");
-              }}
-              disabled={loading}
-              className="border border-border/40 hover:bg-background text-xs uppercase tracking-widest px-6 py-3 flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              Add Color
-            </button>
+          <div className="flex gap-2 items-center">
+            {activeColors.length >= 4 ? (
+              <div className="flex items-center gap-2 text-xs text-amber-500 bg-amber-500/10 border border-amber-500/20 px-4 py-3 rounded font-medium mr-2 max-w-sm">
+                <Info className="w-4 h-4 flex-shrink-0" strokeWidth={2} />
+                <span>You can feature up to 4 colors. Remove one to add another.</span>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setShowAddModal(true);
+                  setModalSearchQuery("");
+                }}
+                disabled={loading}
+                className="border border-border/40 hover:bg-background text-xs uppercase tracking-widest px-6 py-3 flex items-center gap-1.5 transition-colors cursor-pointer mr-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Color
+              </button>
+            )}
             <button
               onClick={handleSave}
               disabled={saving || loading}
@@ -320,6 +332,33 @@ export default function AdminShopByColor() {
                 </button>
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {/* Remove confirmation modal */}
+        {colorToRemove !== null && (
+          <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-card border border-border shadow-lg w-full max-w-sm p-6 rounded flex flex-col space-y-4">
+              <h3 className="font-serif text-lg text-foreground">Remove Featured Color</h3>
+              <p className="text-xs text-muted-foreground">Are you sure you want to remove this featured color?</p>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setColorToRemove(null)}
+                  className="px-4 py-2 border border-border/40 hover:bg-muted text-xs uppercase tracking-widest transition-colors rounded-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    confirmRemoveColor(colorToRemove);
+                    setColorToRemove(null);
+                  }}
+                  className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs uppercase tracking-widest transition-colors rounded-sm cursor-pointer"
+                >
+                  Remove
+                </button>
+              </div>
             </div>
           </div>
         )}

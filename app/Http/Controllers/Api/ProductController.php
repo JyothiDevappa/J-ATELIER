@@ -99,9 +99,7 @@ class ProductController extends Controller
             'price' => ['required', 'numeric', 'min:0'],
             'collection' => ['required', 'string', 'max:255'],
             'colors' => ['nullable', 'array', 'max:4'],
-            'colors.*.id' => ['nullable', 'integer', 'exists:colors,id'],
-            'colors.*.name' => ['required_with:colors', 'string', 'max:255'],
-            'colors.*.hex' => ['required_with:colors', 'string', 'max:255'],
+            'colors.*.id' => ['required', 'integer', 'exists:colors,id'],
             'sizes' => ['nullable', 'array'],
             'images' => ['required', 'array'],
             'story' => ['nullable', 'string'],
@@ -123,21 +121,7 @@ class ProductController extends Controller
 
         $colorIds = [];
         if ($request->has('colors') && is_array($request->input('colors'))) {
-            foreach ($request->input('colors') as $colorData) {
-                $color = null;
-                if (!empty($colorData['id'])) {
-                    $color = Color::find($colorData['id']);
-                }
-                if (!$color) {
-                    $color = Color::firstOrCreate(
-                        ['name' => $colorData['name']],
-                        ['hex' => $colorData['hex']]
-                    );
-                }
-                if ($color) {
-                    $colorIds[] = $color->id;
-                }
-            }
+            $colorIds = collect($request->input('colors'))->pluck('id')->filter()->toArray();
         }
         $product->colors()->sync($colorIds);
         $product->syncVariants();
@@ -170,9 +154,7 @@ class ProductController extends Controller
             'price' => ['required', 'numeric', 'min:0'],
             'collection' => ['required', 'string', 'max:255'],
             'colors' => ['nullable', 'array', 'max:4'],
-            'colors.*.id' => ['nullable', 'integer', 'exists:colors,id'],
-            'colors.*.name' => ['required_with:colors', 'string', 'max:255'],
-            'colors.*.hex' => ['required_with:colors', 'string', 'max:255'],
+            'colors.*.id' => ['required', 'integer', 'exists:colors,id'],
             'sizes' => ['nullable', 'array'],
             'images' => ['required', 'array'],
             'story' => ['nullable', 'string'],
@@ -194,21 +176,7 @@ class ProductController extends Controller
 
         $colorIds = [];
         if ($request->has('colors') && is_array($request->input('colors'))) {
-            foreach ($request->input('colors') as $colorData) {
-                $color = null;
-                if (!empty($colorData['id'])) {
-                    $color = Color::find($colorData['id']);
-                }
-                if (!$color) {
-                    $color = Color::firstOrCreate(
-                        ['name' => $colorData['name']],
-                        ['hex' => $colorData['hex']]
-                    );
-                }
-                if ($color) {
-                    $colorIds[] = $color->id;
-                }
-            }
+            $colorIds = collect($request->input('colors'))->pluck('id')->filter()->toArray();
         }
         $product->colors()->sync($colorIds);
         $product->syncVariants();
@@ -248,37 +216,19 @@ class ProductController extends Controller
      */
     public function colorsIndex(): JsonResponse
     {
-        return response()->json(Color::orderBy('name')->get());
+        $colors = Color::whereHas('products', function ($query) {
+            $query->where('active', 1);
+        })
+        ->withCount(['products' => function ($query) {
+            $query->where('active', 1);
+        }])
+        ->orderByDesc('products_count')
+        ->orderBy('homepage_sort_order')
+        ->orderBy('name')
+        ->get();
+
+        return response()->json($colors);
     }
 
-    /**
-     * POST /api/admin/colors
-     */
-    public function colorsStore(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'hex' => ['required', 'string', 'max:255'],
-        ]);
 
-        $normalizedName = ucwords(strtolower(trim($validated['name'])));
-        $hex = trim($validated['hex']);
-
-        $existing = Color::whereRaw('LOWER(name) = ?', [strtolower($normalizedName)])->first();
-        if ($existing) {
-            return response()->json([
-                'message' => 'The color name already exists.',
-                'errors' => [
-                    'name' => ['The color name already exists.']
-                ]
-            ], 422);
-        }
-
-        $color = Color::create([
-            'name' => $normalizedName,
-            'hex' => $hex,
-        ]);
-
-        return response()->json($color, 201);
-    }
 }

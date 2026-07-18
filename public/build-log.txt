@@ -1,0 +1,21 @@
+
+> build
+> vite build
+
+[36mvite v7.3.6 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m✓[39m 2931 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mpublic/build/[22m[32mmanifest.json                            [39m[1m[2m  2.00 kB[22m[1m[22m[2m │ gzip:   0.42 kB[22m
+[2mpublic/build/[22m[35massets/main-DpoFP3RU.css                 [39m[1m[2m142.59 kB[22m[1m[22m[2m │ gzip:  24.18 kB[22m
+[2mpublic/build/[22m[36massets/vendor-wouter-BlOHdBTn.js         [39m[1m[2m  3.71 kB[22m[1m[22m[2m │ gzip:   1.88 kB[22m
+[2mpublic/build/[22m[36massets/vendor-lucide-q9jvUSZA.js         [39m[1m[2m 11.92 kB[22m[1m[22m[2m │ gzip:   4.48 kB[22m
+[2mpublic/build/[22m[36massets/vendor-tanstack-DfaGwyLX.js       [39m[1m[2m 24.61 kB[22m[1m[22m[2m │ gzip:   7.39 kB[22m
+[2mpublic/build/[22m[36massets/vendor-framer-motion-DOTtwrYD.js  [39m[1m[2m 40.69 kB[22m[1m[22m[2m │ gzip:  14.21 kB[22m
+[2mpublic/build/[22m[36massets/vendor-radix-BoLa9ZGI.js          [39m[1m[2m 59.88 kB[22m[1m[22m[2m │ gzip:  18.52 kB[22m
+[2mpublic/build/[22m[36massets/vendor-react-Bf_F8Trc.js          [39m[1m[2m193.04 kB[22m[1m[22m[2m │ gzip:  60.56 kB[22m
+[2mpublic/build/[22m[36massets/main-3yQCpUde.js                  [39m[1m[2m293.79 kB[22m[1m[22m[2m │ gzip:  60.57 kB[22m
+[2mpublic/build/[22m[36massets/vendor-misc-92oDDYZI.js           [39m[1m[2m296.02 kB[22m[1m[22m[2m │ gzip: 101.47 kB[22m
+[2mpublic/build/[22m[36massets/vendor-charts-a5fH1kdB.js         [39m[1m[2m342.80 kB[22m[1m[22m[2m │ gzip:  85.06 kB[22m
+[32m✓ built in 20.25s[39m

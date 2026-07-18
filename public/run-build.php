@@ -1,0 +1,2 @@
+<?php
+// Build script removed.

@@ -33,6 +33,7 @@ import AdminInventory from "@/pages/admin/AdminInventory";
 import AdminSettings from "@/pages/admin/AdminSettings";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminShopByColor from "@/pages/admin/AdminShopByColor";
+import AdminColors from "@/pages/admin/AdminColors";
 import AdminInstagramGallery from "@/pages/admin/AdminInstagramGallery";
 
 const queryClient = new QueryClient();
@@ -94,6 +95,11 @@ function Router() {
       <Route path="/admin/settings">
         <AdminProtectedRoute>
           <AdminSettings />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/colors">
+        <AdminProtectedRoute>
+          <AdminColors />
         </AdminProtectedRoute>
       </Route>
       <Route path="/admin/shop-by-color">
