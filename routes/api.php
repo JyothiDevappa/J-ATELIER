@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\Route;
 // Store settings — public GET so the brand name loads on every page start
 Route::get('/settings/general',  [AdminSettingsController::class, 'show']);
 
+// Hero Banner — public GET for frontend
+Route::get('/hero-banner', [\App\Http\Controllers\Api\AdminHeroBannerController::class, 'show']);
+
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{product}', [ProductController::class, 'show']);
 Route::get('/colors', [ProductController::class, 'colorsIndex']);
@@ -102,6 +105,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Admin Analytics
         Route::get('/admin/analytics', [\App\Http\Controllers\Api\AdminAnalyticsController::class, 'index']);
+
+        // Admin Hero Banner Management
+        Route::get('/admin/hero-banner', [\App\Http\Controllers\Api\AdminHeroBannerController::class, 'adminShow']);
+        Route::post('/admin/hero-banner', [\App\Http\Controllers\Api\AdminHeroBannerController::class, 'update']);
     });
 });
 

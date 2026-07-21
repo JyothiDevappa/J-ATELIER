@@ -1,5 +1,19 @@
 import axios from './axios';
 
+export interface HeroBanner {
+  id?: number;
+  small_heading: string;
+  main_heading_line1: string;
+  main_heading_line2: string;
+  primary_btn_text: string;
+  primary_btn_url: string;
+  secondary_btn_text: string;
+  secondary_btn_url: string;
+  desktop_image_path: string;
+  mobile_image_path: string | null;
+  is_active?: boolean;
+}
+
 export interface HomepageColor {
   label: string;
   hex: string;
@@ -75,4 +89,23 @@ export const updateAdminInstagramGalleryItem = async (id: number, data: Partial<
 
 export const deleteAdminInstagramGalleryItem = async (id: number): Promise<void> => {
   await axios.delete(`/admin/instagram-gallery/${id}`);
+};
+
+// Hero Banner — Public
+export const fetchHeroBanner = async (): Promise<HeroBanner> => {
+  const response = await axios.get('/hero-banner');
+  return response.data;
+};
+
+// Hero Banner — Admin
+export const fetchAdminHeroBanner = async (): Promise<HeroBanner> => {
+  const response = await axios.get('/admin/hero-banner');
+  return response.data;
+};
+
+export const saveAdminHeroBanner = async (formData: FormData): Promise<HeroBanner> => {
+  const response = await axios.post('/admin/hero-banner', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
 };

@@ -7,7 +7,7 @@ import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
 import { useProducts } from "@/hooks/useProducts";
 import { ScrollIndicator } from "@/components/ScrollIndicator";
-import { fetchHomepageColors, fetchHomepageInstagramGallery, HomepageColor, InstagramGalleryItem } from "@/lib/homepageApi";
+import { fetchHomepageColors, fetchHomepageInstagramGallery, fetchHeroBanner, HeroBanner, HomepageColor, InstagramGalleryItem } from "@/lib/homepageApi";
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 32 },
@@ -20,16 +20,15 @@ const fadeUp: Variants = {
 
 /** Ordered list of homepage sections for the scroll indicator */
 const SCROLL_SECTIONS = [
-  { id: "section-hero",            nextLabel: "COLLECTIONS",         nextId: "section-collections" },
-  { id: "section-collections",     nextLabel: "JUST IN",             nextId: "section-new-arrivals" },
-  { id: "section-new-arrivals",    nextLabel: "CURATED PALETTES",    nextId: "section-color" },
-  { id: "section-color",           nextLabel: "FEATURED COLLECTIONS",nextId: "section-best-sellers" },
-  { id: "section-best-sellers",    nextLabel: "LIMITED EDITION",     nextId: "section-limited-edition" },
-  { id: "section-limited-edition", nextLabel: "OUR STORY",           nextId: "section-our-story" },
-  { id: "section-our-story",       nextLabel: "WHY J ATELIER",       nextId: "section-why" },
-  { id: "section-why",             nextLabel: "AS WORN",             nextId: "section-reviews" },
-  { id: "section-reviews",         nextLabel: "THE EDIT",            nextId: "section-gallery" },
-  { id: "section-gallery",         nextLabel: "THE EDIT",            nextId: "section-newsletter" },
+  { id: "section-hero",            nextLabel: "COLLECTIONS",          nextId: "section-collections" },
+  { id: "section-collections",     nextLabel: "JUST IN",              nextId: "section-new-arrivals" },
+  { id: "section-new-arrivals",    nextLabel: "CURATED PALETTES",     nextId: "section-color" },
+  { id: "section-color",           nextLabel: "FEATURED COLLECTIONS", nextId: "section-best-sellers" },
+  { id: "section-best-sellers",    nextLabel: "LIMITED EDITION",      nextId: "section-limited-edition" },
+  { id: "section-limited-edition", nextLabel: "OUR STORY",            nextId: "section-our-story" },
+  { id: "section-our-story",       nextLabel: "WHY J ATELIER",        nextId: "section-why" },
+  { id: "section-why",             nextLabel: "AS WORN",              nextId: "section-gallery" },
+  { id: "section-gallery",         nextLabel: "THE EDIT",             nextId: "section-newsletter" },
 ];
 
 const COLORS = [
@@ -55,11 +54,7 @@ const GALLERY = [
   "https://images.unsplash.com/photo-1583744946564-b52ac1c389c8?w=600&q=80",
 ];
 
-const REVIEWS = [
-  { name: "Isabelle M.", text: "J Atelier pieces are the only ones I reach for without thinking. That's the highest compliment I can give.", rating: 5 },
-  { name: "Clara T.", text: "I bought my first piece as a treat. Now my wardrobe is almost entirely J Atelier. Worth every penny.", rating: 5 },
-  { name: "Valentina R.", text: "The quality difference is immediately obvious. These aren't just hoodies — they're investments.", rating: 5 },
-];
+
 
 export default function Home() {
   const heroRef = useRef<HTMLElement>(null);
@@ -81,9 +76,29 @@ export default function Home() {
     }))
   );
 
+  // Hero banner state — defaults match current static content as fallback
+  const [heroBanner, setHeroBanner] = useState<HeroBanner>({
+    small_heading: "Spring / Summer 2025",
+    main_heading_line1: "The Art of",
+    main_heading_line2: "Unhurried Style",
+    primary_btn_text: "Discover Collection",
+    primary_btn_url: "/shop",
+    secondary_btn_text: "Limited Edition",
+    secondary_btn_url: "/shop?collection=limited-edition",
+    desktop_image_path: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=1800&q=90",
+    mobile_image_path: null,
+  });
+
+  // Resolve image: prefer mobile_image_path on small viewports, fallback to desktop
+  const heroImageSrc =
+    heroBanner.mobile_image_path && typeof window !== "undefined" && window.innerWidth < 768
+      ? heroBanner.mobile_image_path
+      : heroBanner.desktop_image_path;
+
   useEffect(() => {
     fetchHomepageColors().then(setColors).catch(console.error);
     fetchHomepageInstagramGallery().then(setGallery).catch(console.error);
+    fetchHeroBanner().then(setHeroBanner).catch(console.error);
   }, []);
 
   const { getNewArrivals, getBestSellers, getProductsByColor, loading } = useProducts();
@@ -110,7 +125,7 @@ export default function Home() {
       <section id="section-hero" ref={heroRef} className="relative h-screen overflow-hidden">
         <motion.div style={{ y: heroY }} className="absolute inset-0">
           <img
-            src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=1800&q=90"
+            src={heroImageSrc}
             alt="J Atelier"
             className="w-full h-full object-cover object-top"
           />
@@ -126,7 +141,7 @@ export default function Home() {
             transition={{ duration: 1.2, delay: 0.3 }}
             className="text-xs uppercase tracking-[0.5em] text-foreground/70 mb-6"
           >
-            Spring / Summer 2025
+            {heroBanner.small_heading}
           </motion.p>
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
@@ -134,9 +149,9 @@ export default function Home() {
             transition={{ duration: 1, delay: 0.5, ease: "easeOut" }}
             className="font-serif text-6xl md:text-8xl lg:text-9xl leading-none mb-8 text-foreground"
           >
-            The Art of
+            {heroBanner.main_heading_line1}
             <br />
-            <em>Unhurried</em> Style
+            <em>{heroBanner.main_heading_line2}</em>
           </motion.h1>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -145,19 +160,19 @@ export default function Home() {
             className="flex flex-col sm:flex-row gap-4"
           >
             <Link
-              href="/shop"
+              href={heroBanner.primary_btn_url}
               className="inline-flex items-center gap-3 bg-primary text-primary-foreground px-10 py-4 text-xs uppercase tracking-widest hover:bg-primary/90 transition-colors duration-300"
               data-testid="link-hero-shop"
             >
-              Discover Collection
+              {heroBanner.primary_btn_text}
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
             <Link
-              href="/shop?collection=limited-edition"
+              href={heroBanner.secondary_btn_url}
               className="inline-flex items-center gap-3 bg-transparent border border-foreground/30 text-foreground px-10 py-4 text-xs uppercase tracking-widest hover:bg-foreground/5 transition-colors duration-300"
               data-testid="link-hero-limited"
             >
-              Limited Edition
+              {heroBanner.secondary_btn_text}
             </Link>
           </motion.div>
         </motion.div>
@@ -504,39 +519,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Customer Reviews */}
-      <section id="section-reviews" className="py-24 px-6 max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center mb-16"
-        >
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Worn and Loved</p>
-          <h2 className="font-serif text-4xl md:text-5xl">What They Say</h2>
-        </motion.div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {REVIEWS.map((review, i) => (
-            <motion.div
-              key={review.name}
-              custom={i}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              className="bg-card p-10"
-            >
-              <div className="flex gap-1 mb-6">
-                {Array.from({ length: review.rating }).map((_, j) => (
-                  <span key={j} className="text-accent text-sm">★</span>
-                ))}
-              </div>
-              <p className="font-serif text-lg italic text-foreground/80 mb-6 leading-relaxed">"{review.text}"</p>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">— {review.name}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
 
       {/* Gallery */}
       <section id="section-gallery" className="py-16 px-6 max-w-7xl mx-auto">

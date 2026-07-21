@@ -2,13 +2,14 @@ import { Link, useLocation } from "wouter";
 import { ReactNode } from "react";
 import {
   LayoutDashboard, Package, ShoppingCart, Users, BarChart2,
-  Tag, Layers, Settings, ArrowLeft, LogOut
+  Tag, Layers, Settings, ArrowLeft, LogOut, Image
 } from "lucide-react";
 import { useStoreSetting } from "@/context/StoreSettingContext";
 import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/hero-banner", label: "Hero Banner", icon: Image },
   { href: "/admin/products", label: "Products", icon: Package },
   { href: "/admin/orders", label: "Orders", icon: ShoppingCart },
   { href: "/admin/customers", label: "Customers", icon: Users },

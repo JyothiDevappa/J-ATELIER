@@ -35,6 +35,7 @@ import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminShopByColor from "@/pages/admin/AdminShopByColor";
 import AdminColors from "@/pages/admin/AdminColors";
 import AdminInstagramGallery from "@/pages/admin/AdminInstagramGallery";
+import AdminHeroBanner from "@/pages/admin/AdminHeroBanner";
 
 const queryClient = new QueryClient();
 
@@ -110,6 +111,11 @@ function Router() {
       <Route path="/admin/instagram-gallery">
         <AdminProtectedRoute>
           <AdminInstagramGallery />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/hero-banner">
+        <AdminProtectedRoute>
+          <AdminHeroBanner />
         </AdminProtectedRoute>
       </Route>
       <Route component={NotFound} />
