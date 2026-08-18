@@ -16,20 +16,17 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <script>
-      window.addEventListener('error', function(event) {
-        document.getElementById('root').innerHTML += '<div style="color:red; padding: 20px;"><h1>Global JS Error</h1><pre>' + event.error?.message + '</pre><pre>' + event.error?.stack + '</pre></div>';
-      });
-      window.addEventListener('unhandledrejection', function(event) {
-        document.getElementById('root').innerHTML += '<div style="color:red; padding: 20px;"><h1>Unhandled Promise Rejection</h1><pre>' + event.reason?.message + '</pre><pre>' + event.reason?.stack + '</pre></div>';
-      });
-    </script>
     @viteReactRefresh
     @vite(['resources/js/main.tsx'])
   </head>
-  <body>
+  <body class="bg-[#FAF9F6] text-stone-900 antialiased">
     <div id="root">
-      <h1 style="color: blue; padding: 20px;">If you see this text, React has failed to load or mount entirely. Please tell me if you see this.</h1>
+      <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background-color: #FAF9F6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div style="text-align: center;">
+          <div style="font-size: 26px; letter-spacing: 0.3em; font-weight: 300; text-transform: uppercase; color: #1C1917; margin-bottom: 8px;">J ATELIER</div>
+          <div style="font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: #78716C;">Loading Collection...</div>
+        </div>
+      </div>
     </div>
   </body>
 </html>
