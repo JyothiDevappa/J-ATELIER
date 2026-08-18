@@ -1,0 +1,78 @@
+{
+  "_vendor-charts-a5fH1kdB.js": {
+    "file": "assets/vendor-charts-a5fH1kdB.js",
+    "name": "vendor-charts",
+    "imports": [
+      "_vendor-misc-92oDDYZI.js",
+      "_vendor-react-Bf_F8Trc.js"
+    ]
+  },
+  "_vendor-framer-motion-DOTtwrYD.js": {
+    "file": "assets/vendor-framer-motion-DOTtwrYD.js",
+    "name": "vendor-framer-motion",
+    "imports": [
+      "_vendor-react-Bf_F8Trc.js",
+      "_vendor-misc-92oDDYZI.js"
+    ]
+  },
+  "_vendor-lucide-XgsrNq3h.js": {
+    "file": "assets/vendor-lucide-XgsrNq3h.js",
+    "name": "vendor-lucide",
+    "imports": [
+      "_vendor-react-Bf_F8Trc.js"
+    ]
+  },
+  "_vendor-misc-92oDDYZI.js": {
+    "file": "assets/vendor-misc-92oDDYZI.js",
+    "name": "vendor-misc",
+    "imports": [
+      "_vendor-react-Bf_F8Trc.js"
+    ]
+  },
+  "_vendor-radix-BoLa9ZGI.js": {
+    "file": "assets/vendor-radix-BoLa9ZGI.js",
+    "name": "vendor-radix",
+    "imports": [
+      "_vendor-react-Bf_F8Trc.js",
+      "_vendor-misc-92oDDYZI.js"
+    ]
+  },
+  "_vendor-react-Bf_F8Trc.js": {
+    "file": "assets/vendor-react-Bf_F8Trc.js",
+    "name": "vendor-react"
+  },
+  "_vendor-tanstack-DfaGwyLX.js": {
+    "file": "assets/vendor-tanstack-DfaGwyLX.js",
+    "name": "vendor-tanstack",
+    "imports": [
+      "_vendor-react-Bf_F8Trc.js"
+    ]
+  },
+  "_vendor-wouter-BlOHdBTn.js": {
+    "file": "assets/vendor-wouter-BlOHdBTn.js",
+    "name": "vendor-wouter",
+    "imports": [
+      "_vendor-misc-92oDDYZI.js",
+      "_vendor-react-Bf_F8Trc.js"
+    ]
+  },
+  "resources/js/main.tsx": {
+    "file": "assets/main-C8os0a5E.js",
+    "name": "main",
+    "src": "resources/js/main.tsx",
+    "isEntry": true,
+    "imports": [
+      "_vendor-react-Bf_F8Trc.js",
+      "_vendor-wouter-BlOHdBTn.js",
+      "_vendor-tanstack-DfaGwyLX.js",
+      "_vendor-radix-BoLa9ZGI.js",
+      "_vendor-misc-92oDDYZI.js",
+      "_vendor-lucide-XgsrNq3h.js",
+      "_vendor-framer-motion-DOTtwrYD.js",
+      "_vendor-charts-a5fH1kdB.js"
+    ],
+    "css": [
+      "assets/main-Dgv5ezwz.css"
+    ]
+  }
+}

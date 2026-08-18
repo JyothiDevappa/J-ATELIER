@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "./AdminLayout";
 import { Plus, Search, Edit2, Trash2, X, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchAdminProducts, createProduct, updateProduct, deleteProduct, uploadProductImage, PaginatedProducts, fetchAdminColors } from "@/lib/productApi";
+import { fetchAdminProducts, createProduct, updateProduct, deleteProduct, uploadProductImage, PaginatedProducts, fetchAdminColors, fetchCollections, CollectionItem } from "@/lib/productApi";
 import { clearProductCache } from "@/hooks/useProducts";
 import { Product, ProductColor } from "@/types/product";
 import { toast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ export default function AdminProducts() {
   const [query, setQuery] = useState("");
   const [collection, setCollection] = useState("");
   const [page, setPage] = useState(1);
+  const [dbCollections, setDbCollections] = useState<CollectionItem[]>([]);
 
   // Form states
   const [showForm, setShowForm] = useState(false);
@@ -54,15 +55,19 @@ export default function AdminProducts() {
   const [tempSelectedColor, setTempSelectedColor] = useState<ProductColor | null>(null);
 
   useEffect(() => {
-    const loadColors = async () => {
+    const loadInitData = async () => {
       try {
-        const data = await fetchAdminColors();
-        setAvailableColors(data);
+        const [colorsData, collectionsData] = await Promise.all([
+          fetchAdminColors(),
+          fetchCollections(),
+        ]);
+        setAvailableColors(colorsData);
+        setDbCollections(collectionsData);
       } catch (err) {
-        console.error("Failed to load autocomplete colors", err);
+        console.error("Failed to load admin initial data", err);
       }
     };
-    loadColors();
+    loadInitData();
   }, []);
 
   const loadProducts = async () => {
@@ -344,11 +349,9 @@ export default function AdminProducts() {
               data-testid="select-admin-collection-filter"
             >
               <option value="">All Collections</option>
-              <option value="new-arrivals">New Arrivals</option>
-              <option value="best-sellers">Best Sellers</option>
-              <option value="oversized">Oversized</option>
-              <option value="everyday-essentials">Everyday Essentials</option>
-              <option value="limited-edition">Limited Edition</option>
+              {dbCollections.map((c) => (
+                <option key={c.slug} value={c.slug}>{c.label}</option>
+              ))}
             </select>
           </div>
 
@@ -510,11 +513,9 @@ export default function AdminProducts() {
                     onChange={(e) => setForm({ ...form, collection: e.target.value })}
                     className="w-full bg-transparent border border-border/40 px-4 py-3 text-sm focus:outline-none focus:border-accent cursor-pointer"
                   >
-                    <option value="new-arrivals">New Arrivals</option>
-                    <option value="best-sellers">Best Sellers</option>
-                    <option value="oversized">Oversized</option>
-                    <option value="everyday-essentials">Everyday Essentials</option>
-                    <option value="limited-edition">Limited Edition</option>
+                    {dbCollections.map((c) => (
+                      <option key={c.slug} value={c.slug}>{c.label}</option>
+                    ))}
                   </select>
                   {validationErrors.collection && (
                     <p className="text-xs text-destructive mt-1">{validationErrors.collection[0]}</p>

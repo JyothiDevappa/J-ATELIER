@@ -230,5 +230,29 @@ class ProductController extends Controller
         return response()->json($colors);
     }
 
+    /**
+     * GET /api/collections
+     */
+    public function collectionsIndex(): JsonResponse
+    {
+        $section = \App\Models\HomepageSection::where('section_key', 'featured_collections')->first();
+        $items = $section ? ($section->content_json['items'] ?? []) : [];
 
+        $existingSlugs = collect($items)->pluck('slug')->toArray();
+
+        // Also include any product collection slugs not listed in homepage items
+        $dbCollections = Product::select('collection')->distinct()->whereNotNull('collection')->where('collection', '!=', '')->pluck('collection');
+
+        foreach ($dbCollections as $colSlug) {
+            if (!in_array($colSlug, $existingSlugs)) {
+                $items[] = [
+                    'label' => Str::title(str_replace('-', ' ', $colSlug)),
+                    'slug' => $colSlug,
+                    'image' => ''
+                ];
+            }
+        }
+
+        return response()->json($items);
+    }
 }

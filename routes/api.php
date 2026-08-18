@@ -23,9 +23,16 @@ Route::get('/settings/general',  [AdminSettingsController::class, 'show']);
 // Hero Banner — public GET for frontend
 Route::get('/hero-banner', [\App\Http\Controllers\Api\AdminHeroBannerController::class, 'show']);
 
+// Public Navigation & Footer API
+Route::get('/navigation', [\App\Http\Controllers\Api\AdminNavigationController::class, 'publicIndex']);
+
+// Public Homepage Sections API
+Route::get('/homepage/sections', [\App\Http\Controllers\Api\AdminHomepageSectionsController::class, 'publicIndex']);
+
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{product}', [ProductController::class, 'show']);
 Route::get('/colors', [ProductController::class, 'colorsIndex']);
+Route::get('/collections', [ProductController::class, 'collectionsIndex']);
 Route::get('/homepage/colors', [\App\Http\Controllers\Api\PublicHomepageController::class, 'colors']);
 Route::get('/homepage/instagram-gallery', [\App\Http\Controllers\Api\PublicHomepageController::class, 'instagramGallery']);
 
@@ -109,6 +116,24 @@ Route::middleware('auth:sanctum')->group(function () {
         // Admin Hero Banner Management
         Route::get('/admin/hero-banner', [\App\Http\Controllers\Api\AdminHeroBannerController::class, 'adminShow']);
         Route::post('/admin/hero-banner', [\App\Http\Controllers\Api\AdminHeroBannerController::class, 'update']);
+
+        // Admin Navigation & Footer Management
+        Route::get('/admin/navigation', [\App\Http\Controllers\Api\AdminNavigationController::class, 'adminIndex']);
+        Route::post('/admin/navigation/header', [\App\Http\Controllers\Api\AdminNavigationController::class, 'storeHeaderItem']);
+        Route::put('/admin/navigation/header/{navigationItem}', [\App\Http\Controllers\Api\AdminNavigationController::class, 'updateHeaderItem']);
+        Route::delete('/admin/navigation/header/{navigationItem}', [\App\Http\Controllers\Api\AdminNavigationController::class, 'destroyHeaderItem']);
+        Route::post('/admin/navigation/footer-sections', [\App\Http\Controllers\Api\AdminNavigationController::class, 'storeFooterSection']);
+        Route::put('/admin/navigation/footer-sections/{footerSection}', [\App\Http\Controllers\Api\AdminNavigationController::class, 'updateFooterSection']);
+        Route::delete('/admin/navigation/footer-sections/{footerSection}', [\App\Http\Controllers\Api\AdminNavigationController::class, 'destroyFooterSection']);
+        Route::post('/admin/navigation/footer-links', [\App\Http\Controllers\Api\AdminNavigationController::class, 'storeFooterLink']);
+        Route::put('/admin/navigation/footer-links/{footerLink}', [\App\Http\Controllers\Api\AdminNavigationController::class, 'updateFooterLink']);
+        Route::delete('/admin/navigation/footer-links/{footerLink}', [\App\Http\Controllers\Api\AdminNavigationController::class, 'destroyFooterLink']);
+        Route::post('/admin/navigation/footer-settings', [\App\Http\Controllers\Api\AdminNavigationController::class, 'updateFooterSettings']);
+
+        // Admin Homepage Sections Management
+        Route::get('/admin/homepage-sections', [\App\Http\Controllers\Api\AdminHomepageSectionsController::class, 'adminIndex']);
+        Route::post('/admin/homepage-sections/update', [\App\Http\Controllers\Api\AdminHomepageSectionsController::class, 'updateSection']);
+        Route::post('/admin/homepage-sections/upload-image', [\App\Http\Controllers\Api\AdminHomepageSectionsController::class, 'uploadImage']);
     });
 });
 

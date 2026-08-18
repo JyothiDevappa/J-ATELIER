@@ -17,7 +17,7 @@ export interface Product {
   slug: string;
   name: string;
   price: number;
-  collection: "new-arrivals" | "best-sellers" | "oversized" | "everyday-essentials" | "limited-edition";
+  collection: "new-arrivals" | "best-sellers" | "oversized" | "limited-edition";
   colors: ProductColor[];
   sizes: ("XS" | "S" | "M" | "L")[];
   images: string[];

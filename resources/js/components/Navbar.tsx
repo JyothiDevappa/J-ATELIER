@@ -7,6 +7,7 @@ import { useWishlist } from "@/context/WishlistContext";
 import { SearchOverlay } from "@/components/SearchOverlay";
 import { useAuth } from "@/context/AuthContext";
 import { useStoreSetting } from "@/context/StoreSettingContext";
+import { fetchPublicNavigation, HeaderNavItem } from "@/lib/navigationApi";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -15,6 +16,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+
+const DEFAULT_NAV_LINKS: { href: string; label: string }[] = [
+  { href: "/shop", label: "Shop All" },
+  { href: "/shop?collection=new-arrivals", label: "New Arrivals" },
+];
 
 export function Navbar() {
   const { items: cartItems } = useCart();
@@ -26,8 +32,37 @@ export function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [location] = useLocation();
 
+  const [headerNavItems, setHeaderNavItems] = useState<{ href: string; label: string }[]>(DEFAULT_NAV_LINKS);
+  const [brandName, setBrandName] = useState<string>(settings.store_name ?? 'J Atelier');
+
   const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const isHome = location === "/";
+
+  useEffect(() => {
+    fetchPublicNavigation()
+      .then((data) => {
+        if (data.brand_name) {
+          setBrandName(data.brand_name);
+        }
+        if (data.header_items && data.header_items.length > 0) {
+          setHeaderNavItems(
+            data.header_items.map((item: HeaderNavItem) => ({
+              href: item.url,
+              label: item.label,
+            }))
+          );
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch public navigation items:", err);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (settings.store_name) {
+      setBrandName(settings.store_name);
+    }
+  }, [settings.store_name]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
@@ -38,11 +73,6 @@ export function Navbar() {
   useEffect(() => {
     setMobileOpen(false);
   }, [location]);
-
-  const navLinks = [
-    { href: "/shop", label: "Shop All" },
-    { href: "/shop?collection=new-arrivals", label: "New Arrivals" },
-  ];
 
   const isTransparent = isHome && !scrolled && !mobileOpen;
 
@@ -69,9 +99,9 @@ export function Navbar() {
               {mobileOpen ? <X className="w-5 h-5" strokeWidth={1.5} /> : <Menu className="w-5 h-5" strokeWidth={1.5} />}
             </button>
             <div className="hidden md:flex items-center gap-8">
-              {navLinks.map((link) => (
+              {headerNavItems.map((link) => (
                 <Link
-                  key={link.href}
+                  key={link.href + link.label}
                   href={link.href}
                   className="text-[11px] uppercase tracking-widest hover:text-accent transition-colors duration-300"
                   data-testid={`link-nav-${link.label.toLowerCase().replace(/\s+/g, "-")}`}
@@ -87,7 +117,7 @@ export function Navbar() {
             className="absolute left-1/2 -translate-x-1/2 font-serif text-2xl tracking-[0.25em] hover:text-accent transition-colors duration-300"
             data-testid="link-home"
           >
-            {(settings.store_name ?? 'J Atelier').toUpperCase()}
+            {brandName.toUpperCase()}
           </Link>
 
           <div className="flex items-center gap-5">
@@ -175,9 +205,9 @@ export function Navbar() {
             className="fixed inset-0 z-40 bg-background pt-24 px-8 md:hidden"
           >
             <nav className="flex flex-col gap-8 mt-8">
-              {navLinks.map((link) => (
+              {headerNavItems.map((link) => (
                 <Link
-                  key={link.href}
+                  key={link.href + link.label}
                   href={link.href}
                   className="font-serif text-3xl hover:text-accent transition-colors"
                   data-testid={`link-mobile-${link.label.toLowerCase().replace(/\s+/g, "-")}`}

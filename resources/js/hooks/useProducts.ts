@@ -41,13 +41,20 @@ export function useProducts() {
   const getBestSellers = () => products.filter((p) => p.isBestSeller);
   
   const getProductsByColor = (colorLabel: string) => {
+    const target = colorLabel.trim().toLowerCase();
     const keyword = colorLabel.replace(/\s+/g, "").toLowerCase();
+
     return products.filter((p) => {
-      // If the database has been cleaned and has single specific colors, match exactly
-      if (p.colors && p.colors.length === 1 && p.colors[0].label) {
-        return p.colors[0].label.toLowerCase() === colorLabel.toLowerCase();
+      // 1. Primary match: Check assigned product colors array for matching color name or label
+      if (p.colors && p.colors.length > 0) {
+        const hasColorMatch = p.colors.some((c: any) => {
+          const colorName = (c.name || c.label || "").trim().toLowerCase();
+          return colorName === target;
+        });
+        if (hasColorMatch) return true;
       }
-      // Fallback: search image paths, ensuring we don't match "darkpink" when querying "pink"
+
+      // 2. Fallback: Search image paths for color keyword
       return p.images.some((img: string) => {
         const normalised = img.toLowerCase().replace(/-/g, "");
         if (keyword === "pink" && normalised.includes("darkpink")) {

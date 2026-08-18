@@ -78,3 +78,14 @@ export const updateColor = async (id: number, color: { name: string; hex: string
 export const deleteColor = async (id: number): Promise<void> => {
   await axios.delete(`/admin/colors/${id}`);
 };
+
+export interface CollectionItem {
+  label: string;
+  slug: string;
+  image?: string;
+}
+
+export const fetchCollections = async (): Promise<CollectionItem[]> => {
+  const response = await axios.get('/collections');
+  return response.data;
+};

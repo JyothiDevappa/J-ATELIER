@@ -7,17 +7,15 @@ import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
 import { type Product } from "@/types/product";
 import { useProducts } from "@/hooks/useProducts";
-import { fetchColors } from "@/lib/productApi";
+import { fetchColors, fetchCollections, CollectionItem } from "@/lib/productApi";
 
-const COLLECTIONS = [
+const DEFAULT_COLLECTIONS = [
   { label: "All", value: "" },
   { label: "New Arrivals", value: "new-arrivals" },
   { label: "Best Sellers", value: "best-sellers" },
   { label: "Oversized", value: "oversized" },
-  { label: "Everyday Essentials", value: "everyday-essentials" },
   { label: "Limited Edition", value: "limited-edition" },
 ];
-
 
 const SIZES = ["XS", "S", "M", "L"] as const;
 const SORT_OPTIONS = [
@@ -44,18 +42,31 @@ export default function Shop() {
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [dbColors, setDbColors] = useState<{ id: number; name: string; hex: string }[]>([]);
+  const [dbCollections, setDbCollections] = useState<CollectionItem[]>([]);
 
   useEffect(() => {
-    const loadColors = async () => {
+    const loadFiltersData = async () => {
       try {
-        const data = await fetchColors();
-        setDbColors(data);
+        const [colorsData, collectionsData] = await Promise.all([
+          fetchColors(),
+          fetchCollections(),
+        ]);
+        setDbColors(colorsData);
+        setDbCollections(collectionsData);
       } catch (err) {
-        console.error("Failed to load shop colors", err);
+        console.error("Failed to load shop filter data", err);
       }
     };
-    loadColors();
+    loadFiltersData();
   }, []);
+
+  const collectionsList = useMemo(() => {
+    if (dbCollections.length === 0) return DEFAULT_COLLECTIONS;
+    return [
+      { label: "All", value: "" },
+      ...dbCollections.map((c) => ({ label: c.label, value: c.slug })),
+    ];
+  }, [dbCollections]);
 
   const filtered = useMemo(() => {
     let list = [...products];
@@ -75,7 +86,7 @@ export default function Shop() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const activeCollection = COLLECTIONS.find((c) => c.value === collection);
+  const activeCollection = collectionsList.find((c) => c.value === collection);
 
   return (
     <div className="min-h-screen bg-background">
@@ -141,7 +152,7 @@ export default function Shop() {
                 <div>
                   <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-4">Collection</p>
                   <div className="space-y-2">
-                    {COLLECTIONS.map((c) => (
+                    {collectionsList.map((c) => (
                       <button
                         key={c.value}
                         onClick={() => { setCollection(c.value); setPage(1); }}

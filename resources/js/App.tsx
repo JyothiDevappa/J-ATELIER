@@ -36,6 +36,8 @@ import AdminShopByColor from "@/pages/admin/AdminShopByColor";
 import AdminColors from "@/pages/admin/AdminColors";
 import AdminInstagramGallery from "@/pages/admin/AdminInstagramGallery";
 import AdminHeroBanner from "@/pages/admin/AdminHeroBanner";
+import AdminNavigation from "@/pages/admin/AdminNavigation";
+import AdminHomepageSections from "@/pages/admin/AdminHomepageSections";
 
 const queryClient = new QueryClient();
 
@@ -116,6 +118,16 @@ function Router() {
       <Route path="/admin/hero-banner">
         <AdminProtectedRoute>
           <AdminHeroBanner />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/navigation">
+        <AdminProtectedRoute>
+          <AdminNavigation />
+        </AdminProtectedRoute>
+      </Route>
+      <Route path="/admin/homepage-sections">
+        <AdminProtectedRoute>
+          <AdminHomepageSections />
         </AdminProtectedRoute>
       </Route>
       <Route component={NotFound} />
